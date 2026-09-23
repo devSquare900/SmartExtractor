@@ -1,0 +1,169 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+  border-radius: 20px;
+}
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.toolbar .search {
+  width: 280px;
+}
+.toolbar .date-field .input {
+  width: 160px;
+}
+.toolbar select.input {
+  width: 180px;
+}
+
+.table-card {
+  overflow: hidden;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.table-skeleton {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+.table-empty {
+  padding: 28px;
+}
+
+.doc-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+.doc-table th {
+  position: sticky;
+  top: 0;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.doc-table th:first-child {
+  padding-left: 22px;
+}
+.doc-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.doc-table td:first-child {
+  padding-left: 22px;
+}
+.doc-table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.doc-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.doc-table tbody tr:hover,
+.doc-table tbody tr:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+.doc-table tbody tr:focus-visible td:first-child {
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+.doc-table .num {
+  text-align: right;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.ellipsis {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-cell {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 260px;
+}
+.doc-cell > div {
+  min-width: 0;
+}
+.doc-name {
+  font-weight: 600;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 320px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dot-sep::before {
+  content: '·';
+  margin-right: 8px;
+}
+.bad-text {
+  color: var(--bad);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actions-cell {
+  width: 48px;
+  text-align: right;
+}
+.row-menu {
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+tr:hover .row-menu,
+.row-menu.open,
+.row-menu:focus-visible {
+  opacity: 1;
+}
+
+.table-foot {
+  margin: 14px 4px 0;
+  font-size: 12.5px;
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .toolbar .search {
+    width: 100%;
+  }
+  .toolbar-right {
+    width: 100%;
+  }
+  .segmented {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}

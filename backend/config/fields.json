@@ -1,0 +1,41 @@
+{
+  "date_order": "DMY",
+  "low_confidence_threshold": 0.85,
+  "max_label_length": 40,
+  "_labels_note": "Labels are compared lowercase without spaces, and are listed in priority order (first = preferred).",
+
+  "contract_title_keywords": [
+    "AGREEMENT", "CONTRACT", "DEED", "MEMORANDUM", "PROPOSAL", "STATEMENT OF WORK", "ORDER FORM", "INVOICE"
+  ],
+
+  "fields": [
+    {"section": "customer_info", "key": "name", "type": "text", "match": "contains",
+     "labels": ["nameofcustomer", "customername"]},
+    {"section": "customer_info", "key": "billing_address", "type": "text", "match": "contains",
+     "labels": ["billingaddress"]},
+    {"section": "customer_info", "key": "poc_contact", "type": "text", "match": "contains",
+     "labels": ["pocname", "contactnumber"]},
+    {"section": "customer_info", "key": "email", "type": "text", "match": "contains",
+     "labels": ["emailaddress"]},
+
+    {"section": "document_info", "key": "date", "type": "date", "match": "exact",
+     "labels": ["date", "dated", "invoicedate", "contractdate", "effectivedate", "issuedate"]},
+    {"section": "document_info", "key": "doc_number", "type": "text", "match": "contains",
+     "labels": ["invoice#", "invoicenumber", "invoiceno", "contract#", "contractnumber", "contractno"]},
+    {"section": "document_info", "key": "amount", "type": "amount", "match": "exact",
+     "labels": ["grandtotal", "totalamount", "totalpayable", "amountdue", "totaldue", "netamount", "total", "amount"]},
+    {"section": "document_info", "key": "po_number", "type": "text", "match": "contains",
+     "labels": ["po#", "ponumber", "pono", "purchaseorder", "purchaseordernumber"]},
+
+    {"section": null, "key": "service_provider", "type": "text", "match": "contains",
+     "labels": ["serviceprovider", "accountmanager"]}
+  ],
+
+  "line_items": {
+    "start_labels": ["scopeofwork", "deliverables", "annexure", "lineitems"],
+    "stop_keywords": ["monthly recurring", "grand total", "authorized signatory", "signatures", "payment", "confidentiality"],
+    "ignore_keywords": ["legally binding"],
+    "header_words": ["item", "sr", "s.no", "no.", "#", "description", "service", "qty", "quantity",
+                     "unit", "rate", "price", "amount", "total", "mrc", "otc", "uom"]
+  }
+}
