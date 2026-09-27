@@ -136,15 +136,23 @@ def extract_data(doc_id: str, pages: list) -> dict:
 
 def process_document(doc_id: str, file_path: str):
     """Background task: render pages, get text (PDF text layer or OCR), parse fields."""
+    def progress(pct: int, msg: str):
+        db.update_document(doc_id, progress_pct=pct, progress_msg=msg)
+
     try:
-        pages = convert_pdf_to_images(file_path, os.path.join(IMAGES_DIR, doc_id))
-        ocr_pages = run_ocr_on_images(pages)
+        progress(0, "Starting processing...")
+        pages = convert_pdf_to_images(file_path, os.path.join(IMAGES_DIR, doc_id), progress_callback=progress)
+        ocr_pages = run_ocr_on_images(pages, progress_callback=progress)
+        
+        progress(80, "Extracting fields and line items...")
         extracted = extract_data(doc_id, ocr_pages)
+        
+        progress(95, "Saving document...")
         db.update_document(doc_id, status="completed", error=None, pages=ocr_pages, extracted=extracted,
-                           summary=compute_summary(extracted, ocr_pages))
+                           summary=compute_summary(extracted, ocr_pages), progress_pct=100, progress_msg="Done")
     except Exception as e:
         print(f"Error processing {doc_id}: {traceback.format_exc()}")
-        db.update_document(doc_id, status="error", error=str(e) or e.__class__.__name__)
+        db.update_document(doc_id, status="error", error=str(e) or e.__class__.__name__, progress_msg="Failed")
 
 
 @app.post("/api/upload")

@@ -34,14 +34,20 @@ def ocr_image(img_path: str) -> list[dict]:
     return blocks
 
 
-def run_ocr_on_images(pages: list[dict]) -> list[dict]:
+def run_ocr_on_images(pages: list[dict], progress_callback=None) -> list[dict]:
     """
     Builds structured page data. Pages that already have text_blocks (PDF text layer)
     skip OCR; the rest are OCR'd.
     """
     pages_data = []
+    total = len(pages)
 
     for page_idx, page in enumerate(pages):
+        if progress_callback:
+            # Map OCR to 20% -> 80%
+            pct = 20 + int((page_idx / max(1, total)) * 60)
+            progress_callback(pct, f"Running AI OCR on page {page_idx + 1} of {total}...")
+            
         img_path = page["image_path"]
         blocks = page.get("text_blocks")
         source = "text_layer"

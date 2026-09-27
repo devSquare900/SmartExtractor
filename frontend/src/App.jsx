@@ -45,6 +45,14 @@ export default function App() {
   const fileInputRef = useRef(null);
   const uploadingRef = useRef(false);
 
+  const wasOnline = useRef(true);
+  useEffect(() => {
+    if (wasOnline.current && !online) {
+      notify('Backend is not running or not responding', 'error');
+    }
+    wasOnline.current = online;
+  }, [online, notify]);
+
   const stats = useMemo(() => computeStats(documents), [documents]);
 
   // ----- Theme -----

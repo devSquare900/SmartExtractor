@@ -48,7 +48,7 @@ def _words_to_blocks(words, zoom):
     return result
 
 
-def convert_pdf_to_images(file_path: str, images_dir: str) -> list[dict]:
+def convert_pdf_to_images(file_path: str, images_dir: str, progress_callback=None) -> list[dict]:
     """
     Renders each page to an image. For PDFs with a real text layer, the page's text blocks
     are extracted directly (faster and more accurate than OCR).
@@ -64,7 +64,13 @@ def convert_pdf_to_images(file_path: str, images_dir: str) -> list[dict]:
     if ext == ".pdf":
         doc = fitz.open(file_path)
         try:
-            for page_num in range(len(doc)):
+            total_pages = len(doc)
+            for page_num in range(total_pages):
+                if progress_callback:
+                    # Map PDF rendering to 0% -> 20%
+                    pct = int((page_num / total_pages) * 20)
+                    progress_callback(pct, f"Rendering page {page_num + 1} of {total_pages}...")
+                
                 page = doc.load_page(page_num)
 
                 pix = page.get_pixmap(matrix=fitz.Matrix(ZOOM, ZOOM))

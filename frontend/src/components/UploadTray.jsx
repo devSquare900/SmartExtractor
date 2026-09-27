@@ -44,14 +44,20 @@ export default function UploadTray({ uploads, documents, onOpen, onClear }) {
               <FileIcon filename={r.name} size={30} />
               <div className="tray-body">
                 <span className="tray-name" title={r.name}>{r.name}</span>
-                {r.phase === 'uploading' && (
-                  <span className="tray-progress"><span style={{ width: `${r.progress}%` }} /></span>
+                {(r.phase === 'uploading' || r.phase === 'processing') && (
+                  <span className="tray-progress">
+                    <span style={{ 
+                      width: `${r.phase === 'uploading' ? r.progress : (r.doc?.progress_pct || 0)}%`,
+                      transition: 'width 0.5s ease-in-out'
+                    }} />
+                  </span>
                 )}
-                {r.phase === 'processing' && <span className="tray-meta shimmer-text">Reading pages…</span>}
+                {r.phase === 'processing' && <span className="tray-meta shimmer-text">{r.doc?.progress_msg || 'Processing...'}</span>}
                 {r.phase === 'done' && <span className="tray-meta ok">Ready to review</span>}
                 {r.phase === 'failed' && <span className="tray-meta bad">{r.error || r.doc?.error || 'Failed'}</span>}
               </div>
               {r.phase === 'uploading' && <span className="tray-pct mono">{r.progress}%</span>}
+              {r.phase === 'processing' && <span className="tray-pct mono">{r.doc?.progress_pct || 0}%</span>}
               {r.phase === 'done' && (
                 <button className="btn btn-secondary btn-sm" onClick={() => onOpen(r.docId)}>
                   Open <ArrowUpRight size={14} />

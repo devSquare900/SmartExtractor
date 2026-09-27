@@ -10,25 +10,25 @@
 
   "fields": [
     {"section": "customer_info", "key": "name", "type": "text", "match": "contains",
-     "labels": ["nameofcustomer", "customername"]},
+     "labels": ["nameofcustomer", "customername", "customer", "client", "clientname", "billedto", "soldto", "billto"]},
     {"section": "customer_info", "key": "billing_address", "type": "text", "match": "contains",
-     "labels": ["billingaddress"]},
+     "labels": ["billingaddress", "address", "shippingaddress", "shipto", "customeraddress"]},
     {"section": "customer_info", "key": "poc_contact", "type": "text", "match": "contains",
-     "labels": ["pocname", "contactnumber"]},
+     "labels": ["pocname", "contactnumber", "contact", "phone", "phonenumber", "telephone", "mobile", "cell"]},
     {"section": "customer_info", "key": "email", "type": "text", "match": "contains",
-     "labels": ["emailaddress"]},
+     "labels": ["emailaddress", "email", "e-mail", "mail", "contactemail", "emailid"]},
 
     {"section": "document_info", "key": "date", "type": "date", "match": "exact",
-     "labels": ["date", "dated", "invoicedate", "contractdate", "effectivedate", "issuedate"]},
+     "labels": ["date", "dated", "invoicedate", "contractdate", "effectivedate", "issuedate", "billingdate", "orderdate"]},
     {"section": "document_info", "key": "doc_number", "type": "text", "match": "contains",
-     "labels": ["invoice#", "invoicenumber", "invoiceno", "contract#", "contractnumber", "contractno"]},
+     "labels": ["invoice#", "invoicenumber", "invoiceno", "contract#", "contractnumber", "contractno", "billnumber", "billno", "receiptno", "receiptnumber", "formno", "formnumber"]},
     {"section": "document_info", "key": "amount", "type": "amount", "match": "exact",
-     "labels": ["grandtotal", "totalamount", "totalpayable", "amountdue", "totaldue", "netamount", "total", "amount"]},
+     "labels": ["grandtotal", "totalamount", "totalpayable", "amountdue", "totaldue", "netamount", "total", "amount", "balance", "balancedue", "subtotal"]},
     {"section": "document_info", "key": "po_number", "type": "text", "match": "contains",
-     "labels": ["po#", "ponumber", "pono", "purchaseorder", "purchaseordernumber"]},
+     "labels": ["po#", "ponumber", "pono", "purchaseorder", "purchaseordernumber", "order#", "orderno", "ordernumber"]},
 
     {"section": null, "key": "service_provider", "type": "text", "match": "contains",
-     "labels": ["serviceprovider", "accountmanager"]}
+     "labels": ["serviceprovider", "accountmanager", "vendor", "supplier", "merchant", "companyname", "from"]}
   ],
 
   "line_items": {

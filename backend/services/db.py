@@ -20,13 +20,15 @@ CREATE TABLE IF NOT EXISTS documents (
     pages_json     TEXT,
     extracted_json TEXT,
     edited_json    TEXT,
-    summary_json   TEXT
+    summary_json   TEXT,
+    progress_pct   INTEGER,
+    progress_msg   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents(created_at);
 """
 
 LIST_COLUMNS = ("doc_id, filename, status, error, created_at, updated_at, summary_json, "
-                "edited_json IS NOT NULL AS edited")
+                "progress_pct, progress_msg, edited_json IS NOT NULL AS edited")
 
 
 @contextmanager
@@ -48,6 +50,9 @@ def init_db(db_path: str = None):
         columns = {r["name"] for r in conn.execute("PRAGMA table_info(documents)")}
         if "summary_json" not in columns:
             conn.execute("ALTER TABLE documents ADD COLUMN summary_json TEXT")
+        if "progress_pct" not in columns:
+            conn.execute("ALTER TABLE documents ADD COLUMN progress_pct INTEGER")
+            conn.execute("ALTER TABLE documents ADD COLUMN progress_msg TEXT")
 
 
 def _now():
