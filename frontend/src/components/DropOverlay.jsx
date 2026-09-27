@@ -7,34 +7,40 @@ export default function DropOverlay({ onFiles }) {
   const depth = useRef(0);
 
   useEffect(() => {
-    const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
     const onEnter = (e) => {
-      if (!hasFiles(e)) return;
-      depth.current += 1;
-      setActive(true);
+      if (Array.from(e.dataTransfer?.types || []).includes('Files')) {
+        setActive(true);
+      }
+    };
+    const onOver = (e) => {
+      if (Array.from(e.dataTransfer?.types || []).includes('Files')) {
+        e.preventDefault();
+        setActive(true);
+      }
     };
     const onLeave = (e) => {
-      if (!hasFiles(e)) return;
-      depth.current = Math.max(0, depth.current - 1);
-      if (depth.current === 0) setActive(false);
+      if (!e.relatedTarget) {
+        setActive(false);
+      }
     };
-    const onOver = (e) => hasFiles(e) && e.preventDefault();
     const onDrop = (e) => {
-      if (!hasFiles(e)) return;
       e.preventDefault();
-      depth.current = 0;
       setActive(false);
-      if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files);
+      if (e.dataTransfer?.files?.length) onFiles(e.dataTransfer.files);
     };
+    const forceClose = () => setActive(false);
+
     window.addEventListener('dragenter', onEnter);
-    window.addEventListener('dragleave', onLeave);
     window.addEventListener('dragover', onOver);
+    window.addEventListener('dragleave', onLeave);
     window.addEventListener('drop', onDrop);
+    window.addEventListener('close-drop-overlay', forceClose);
     return () => {
       window.removeEventListener('dragenter', onEnter);
-      window.removeEventListener('dragleave', onLeave);
       window.removeEventListener('dragover', onOver);
+      window.removeEventListener('dragleave', onLeave);
       window.removeEventListener('drop', onDrop);
+      window.removeEventListener('close-drop-overlay', forceClose);
     };
   }, [onFiles]);
 
