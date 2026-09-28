@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Upload, MoreHorizontal, ArrowUpRight, Download, FileJson, FileSpreadsheet, Trash2, SearchX, X } from 'lucide-react';
+import { Search, Upload, MoreHorizontal, ArrowUpRight, Download, FileJson, FileSpreadsheet, Trash2, SearchX, X, CheckSquare, Square } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import StatusBadge from '../components/StatusBadge';
 import ConfidenceMeter from '../components/ConfidenceMeter';
@@ -65,6 +65,7 @@ export default function Documents({ documents, loaded, navigate, onUpload, onFil
   const [search, setSearch] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [sort, setSort] = useState('newest');
+  const [selected, setSelected] = useState(new Set());
   const searchRef = useRef(null);
 
   // "/" focuses search
@@ -98,9 +99,50 @@ export default function Documents({ documents, loaded, navigate, onUpload, onFil
       .sort(SORTS[sort].fn);
   }, [documents, status, fromDate, search, sort]);
 
-  const setStatus = (key) => navigate(key === 'all' ? '/documents' : `/documents?status=${key}`);
+  const setStatus = (key) => {
+    navigate(key === 'all' ? '/documents' : `/documents?status=${key}`);
+    setSelected(new Set());
+  };
   const hasFilters = search || fromDate || status !== 'all';
-  const clearFilters = () => { setSearch(''); setFromDate(''); setStatus('all'); };
+  const clearFilters = () => { setSearch(''); setFromDate(''); setStatus('all'); setSelected(new Set()); };
+
+  const isAllSelected = rows.length > 0 && selected.size === rows.length;
+  const isSomeSelected = selected.size > 0;
+
+  const toggleAll = () => {
+    if (isAllSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(rows.map((r) => r.doc_id)));
+    }
+  };
+
+  const toggleOne = (e, id) => {
+    e.stopPropagation();
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  };
+
+  const bulkDelete = () => {
+    if (!window.confirm(`Delete ${selected.size} selected documents?`)) return;
+    const docsToDelete = documents.filter((d) => selected.has(d.doc_id));
+    docsToDelete.forEach((d) => onDelete(d));
+    setSelected(new Set());
+  };
+
+  const bulkExportJson = () => {
+    const data = documents.filter((d) => selected.has(d.doc_id));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `smartextractor_export_${selected.size}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setSelected(new Set());
+  };
 
   const title = { all: 'Documents', ready: 'Ready to use', review: 'Needs review', processing: 'Processing', error: 'Failed' }[status];
   const subtitle = {
@@ -158,6 +200,17 @@ export default function Documents({ documents, loaded, navigate, onUpload, onFil
         </div>
       </div>
 
+      {isSomeSelected && (
+        <div className="bulk-toolbar card rise">
+          <span className="bulk-count">{selected.size} document{selected.size > 1 ? 's' : ''} selected</span>
+          <div className="bulk-actions">
+            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set())}>Cancel</button>
+            <button className="btn btn-secondary btn-sm" onClick={bulkExportJson}><FileJson size={16} /> Export JSON</button>
+            <button className="btn btn-danger btn-sm" onClick={bulkDelete}><Trash2 size={16} /> Delete</button>
+          </div>
+        </div>
+      )}
+
       <section className="card table-card rise" style={{ '--i': 1 }}>
         {!loaded ? (
           <div className="table-skeleton">
@@ -180,6 +233,11 @@ export default function Documents({ documents, loaded, navigate, onUpload, onFil
             <table className="doc-table">
               <thead>
                 <tr>
+                  <th className="checkbox-cell">
+                    <button className="btn-icon bulk-check" onClick={toggleAll} aria-label="Select all">
+                      {isAllSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                    </button>
+                  </th>
                   <th>Document</th>
                   <th>Customer</th>
                   <th>Doc. date</th>
@@ -195,7 +253,12 @@ export default function Documents({ documents, loaded, navigate, onUpload, onFil
                   const s = doc.summary || {};
                   const open = () => navigate(`/documents/${doc.doc_id}`);
                   return (
-                    <tr key={doc.doc_id} onClick={open} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && open()}>
+                    <tr key={doc.doc_id} onClick={open} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && open()} className={selected.has(doc.doc_id) ? 'selected-row' : ''}>
+                      <td className="checkbox-cell">
+                        <button className="btn-icon bulk-check" onClick={(e) => toggleOne(e, doc.doc_id)} aria-label="Select">
+                          {selected.has(doc.doc_id) ? <CheckSquare size={16} /> : <Square size={16} />}
+                        </button>
+                      </td>
                       <td>
                         <div className="doc-cell">
                           <FileIcon filename={doc.filename} size={36} />

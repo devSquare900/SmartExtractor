@@ -6,10 +6,9 @@ import { displayStatus } from '../lib/status';
 // Bottom-right panel following each upload from transfer through processing.
 export default function UploadTray({ uploads, documents, onOpen, onClear }) {
   const [collapsed, setCollapsed] = useState(false);
-  if (!uploads.length) return null;
-
   const byId = Object.fromEntries(documents.map((d) => [d.doc_id, d]));
-  const rows = uploads.map((u) => {
+  
+  const uploadRows = uploads.map((u) => {
     const doc = u.docId ? byId[u.docId] : null;
     let phase = u.state;
     if (u.state === 'uploaded') {
@@ -18,8 +17,31 @@ export default function UploadTray({ uploads, documents, onOpen, onClear }) {
     }
     return { ...u, doc, phase };
   });
+
+  const uploadDocIds = new Set(uploadRows.map(r => r.docId).filter(Boolean));
+  
+  // Include any documents that are processing but not in the current upload session
+  const processingDocs = documents.filter((d) => {
+    const s = displayStatus(d);
+    return s === 'processing' && !uploadDocIds.has(d.doc_id);
+  });
+
+  const docRows = processingDocs.map((d) => ({
+    key: `doc-${d.doc_id}`,
+    name: d.filename,
+    progress: 100,
+    state: 'uploaded',
+    docId: d.doc_id,
+    doc: d,
+    phase: 'processing'
+  }));
+
+  const rows = [...uploadRows, ...docRows];
+  
   const active = rows.filter((r) => r.phase === 'uploading' || r.phase === 'processing').length;
   const done = rows.filter((r) => r.phase === 'done').length;
+
+  if (!rows.length) return null;
 
   return (
     <section className={`upload-tray ${collapsed ? 'collapsed' : ''}`} aria-label="Uploads">

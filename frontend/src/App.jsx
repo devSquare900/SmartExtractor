@@ -10,6 +10,7 @@ import ConfirmDialog from './components/ConfirmDialog';
 import Overview from './pages/Overview';
 import Documents from './pages/Documents';
 import Review from './pages/Review';
+import OfflineOverlay from './components/OfflineOverlay';
 import { ACCEPTED_TYPES } from './lib/uploads';
 
 const POLL_INTERVAL_MS = 3000;
@@ -45,13 +46,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   const uploadingRef = useRef(false);
 
-  const wasOnline = useRef(true);
-  useEffect(() => {
-    if (wasOnline.current && !online) {
-      notify('Backend is not running or not responding', 'error');
-    }
-    wasOnline.current = online;
-  }, [online, notify]);
+  // (Offline notification removed in favor of OfflineOverlay)
 
   const stats = useMemo(() => computeStats(documents), [documents]);
 
@@ -95,10 +90,10 @@ export default function App() {
     fetchDocuments();
   }, [fetchDocuments]);
 
-  // Poll while something is processing, or slowly while the backend is offline.
+  // Poll while something is processing
   useEffect(() => {
-    if (stats.processing === 0 && online) return undefined;
-    const interval = setInterval(fetchDocuments, online ? POLL_INTERVAL_MS : POLL_INTERVAL_MS * 3);
+    if (stats.processing === 0 || !online) return undefined;
+    const interval = setInterval(fetchDocuments, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [stats.processing, online, fetchDocuments]);
 
@@ -126,7 +121,10 @@ export default function App() {
     const batch = files.map((file, i) => ({
       key: `${Date.now()}-${i}-${file.name}`, name: file.name, progress: 0, state: 'queued',
     }));
-    setUploads((current) => [...current.filter((u) => u.state === 'uploading'), ...batch]);
+    setUploads((current) => {
+      // Keep existing items in the tray until the user explicitly clears them
+      return [...current, ...batch];
+    });
     const patch = (key, changes) => setUploads((list) => list.map((u) => (u.key === key ? { ...u, ...changes } : u)));
 
     for (const [i, file] of files.entries()) {
@@ -217,13 +215,10 @@ export default function App() {
         onToggleCollapse={toggleNav}
       />
       <main className="app-main" id="main">
-        {!online && loaded && (
-          <div className="offline-banner" role="alert">
-            Can't reach the extraction engine. Start the backend on port 8000 — retrying automatically.
-          </div>
-        )}
         {page}
       </main>
+
+      {!online && loaded && <OfflineOverlay onRetry={fetchDocuments} />}
 
       <input
         ref={fileInputRef}
