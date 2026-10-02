@@ -123,15 +123,110 @@ def get_doc_or_404(doc_id: str) -> dict:
 
 
 def extract_data(doc_id: str, pages: list) -> dict:
-    """Parses fields, then re-reads empty table cells on OCR'd pages."""
-    extracted = parse_extracted_data(pages)
-    try:
-        filled = recover_empty_cells(extracted["line_items"], pages, os.path.join(IMAGES_DIR, doc_id), recognize_region)
-        if filled:
-            print(f"Recovered {filled} empty table cell(s) for {doc_id}")
-    except Exception:
-        print(f"Cell recovery skipped for {doc_id}: {traceback.format_exc()}")
-    return extracted
+    """Parses fields using Groq LLM instead of old manual parser."""
+    # 1. Combine text from OCR pages
+    full_text = ""
+    for page in pages:
+        for block in page.get("blocks", []):
+            full_text += block.get("text", "") + "\n"
+            
+    # 2. Call the LLM (Llama-3)
+    from services.llm_parser import extract_data_with_llm
+    llm_result = extract_data_with_llm(full_text)
+    if not llm_result:
+        llm_result = {}
+
+    def get_val(key):
+        val = llm_result.get(key, "")
+        return "" if val == "N/A" else val
+
+    def get_confidence_and_box(val):
+        if not val:
+            return 1.0, None, None
+        
+        val_lower = val.lower().strip()
+        if val_lower in ["n/a", "na", "not mentioned", "none", "not available", "missing"]:
+            return 1.0, None, None
+        
+        import re
+        words_val = [w for w in re.split(r'\W+', val_lower) if len(w) > 0]
+        if not words_val:
+            return 1.0, None, None
+
+        best_score = 0
+        best_conf = 0.5
+        best_box = None
+        best_page = None
+
+        for p_idx, page in enumerate(pages):
+            for block in page.get("blocks", []):
+                text = block.get("text", "").lower().strip()
+                words_text = [w for w in re.split(r'\W+', text) if len(w) > 0]
+                if not words_text:
+                    continue
+                
+                matched_words = 0
+                for w in words_val:
+                    if w in words_text:
+                        matched_words += 1
+                    else:
+                        # Partial match for longer words (e.g. October vs Oct)
+                        if len(w) >= 4 and any(w[:4] in wt for wt in words_text):
+                            matched_words += 0.5
+                
+                if matched_words == 0:
+                    continue
+                
+                match_ratio = matched_words / len(words_val)
+                score = match_ratio * 100
+                
+                # Penalty if block has way too many extra words
+                length_ratio = len(words_val) / max(1, len(words_text))
+                score += length_ratio * 20
+                
+                if text == val_lower:
+                    score += 50
+                elif val_lower in text:
+                    score += 30
+
+                # Must have a solid score (e.g. at least ~half the words matching)
+                if score > best_score and score >= 40:
+                    best_score = score
+                    best_conf = block.get("confidence", 0.5)
+                    best_box = block.get("box")
+                    best_page = p_idx + 1
+
+        return round(best_conf, 4), best_box, best_page
+
+    def make_field(key):
+        val = get_val(key)
+        conf, box, page_num = get_confidence_and_box(val) if val else (1.0, None, None)
+        field_dict = {"value": val, "confidence": conf}
+        if box:
+            field_dict["box"] = box
+            field_dict["page_num"] = page_num
+        return field_dict
+
+    # 3. Format the result to match the expected legacy structure so the Frontend doesn't crash
+    formatted_data = {
+        "contract_name": {"value": "LLM Extracted Document", "confidence": 1.0},
+        "document_info": {
+            "execution_date": make_field("execution_date"),
+            "expiry_date": make_field("expiry_date"),
+            "validity_tenure": make_field("validity_tenure"),
+            "mrc_otc": make_field("mrc_otc"),
+            "termination_clause": make_field("termination_clause")
+        },
+        "customer_info": {},
+        "line_items": {"columns": [], "rows": []}
+    }
+    
+    # 4. Normalize fields before saving so that amounts and dates are correctly parsed
+    from services.parser import normalize_fields, load_config
+    config = load_config()
+    formatted_data = normalize_fields(formatted_data, config)
+    
+    return formatted_data
 
 
 def process_document(doc_id: str, file_path: str):
@@ -258,7 +353,10 @@ def reextract_document(doc_id: str):
     doc = get_doc_or_404(doc_id)
     if doc["status"] != "completed":
         raise HTTPException(status_code=409, detail="Document is not processed yet.")
-    extracted = extract_data(doc_id, doc["pages"] or [])
+    try:
+        extracted = extract_data(doc_id, doc["pages"] or [])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     db.update_document(doc_id, extracted=extracted, edited=None, summary=compute_summary(extracted, doc["pages"]))
     return {"edited": False, "data": extracted}
 

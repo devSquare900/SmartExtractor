@@ -19,25 +19,15 @@ import './review.css';
 
 const SECTIONS = [
   {
-    key: 'customer_info',
-    title: 'Customer',
-    icon: Building2,
-    fields: [
-      { key: 'name', label: 'Customer name', rows: 2 },
-      { key: 'email', label: 'Email' },
-      { key: 'billing_address', label: 'Billing address', rows: 3 },
-      { key: 'poc_contact', label: 'Contact / phone', rows: 2 },
-    ],
-  },
-  {
     key: 'document_info',
-    title: 'Document details',
+    title: 'Extracted Contract Details',
     icon: ReceiptText,
     fields: [
-      { key: 'date', label: 'Date', type: 'date' },
-      { key: 'doc_number', label: 'Document / invoice no.' },
-      { key: 'amount', label: 'Total amount', type: 'amount' },
-      { key: 'po_number', label: 'PO number' },
+      { key: 'execution_date', label: 'Execution Date' },
+      { key: 'expiry_date', label: 'Expiry Date' },
+      { key: 'validity_tenure', label: 'Validity Tenure' },
+      { key: 'mrc_otc', label: 'MRC / OTC' },
+      { key: 'termination_clause', label: 'Termination Clause', rows: 4 },
     ],
   },
 ];
@@ -91,8 +81,8 @@ function FieldRow({ def, field, threshold, onChange, onFocus, onLocate }) {
           {field && !field.manual && typeof field.confidence === 'number' && (
             <span className={`flag conf ${tone}`} title="OCR confidence">{Math.round(field.confidence * 100)}%</span>
           )}
-          {field?.box && (
-            <button type="button" className="locate" onClick={onLocate} title={`Show on page ${field.page_num}`} aria-label={`Show ${def.label} on the page`}>
+          {(field?.box || (field?.value && !field.manual)) && (
+            <button type="button" className="locate" onClick={onLocate} title="Highlight on page" aria-label={`Show ${def.label} on the page`}>
               <Crosshair size={14} />
             </button>
           )}
@@ -258,7 +248,7 @@ export default function Review({ docId, doc, loaded, navigate, onDelete, onUploa
   const scored = [...allFields.map((f) => f.field), ...rows].filter((x) => x && !x.manual && typeof x.confidence === 'number');
   const avg = scored.length ? scored.reduce((a, x) => a + x.confidence, 0) / scored.length : null;
 
-  const focus = (item, label) => item?.box && setActiveBox({ box: item.box, page_num: item.page_num, label });
+  const focus = (item, label) => item && setActiveBox({ box: item.box, page_num: item.page_num, value: item.value, label });
   const exportUrl = (format) => `${API_BASE_URL}/documents/${docId}/export?format=${format}`;
 
   /* ---------- not found / loading ---------- */

@@ -72,14 +72,11 @@ export function dailyActivity(documents, days = 14) {
 }
 
 export const FIELD_LABELS = [
-  ['customer_info.name', 'Customer name'],
-  ['customer_info.billing_address', 'Billing address'],
-  ['customer_info.poc_contact', 'Contact / phone'],
-  ['customer_info.email', 'Email'],
-  ['document_info.date', 'Date'],
-  ['document_info.doc_number', 'Document no.'],
-  ['document_info.amount', 'Total amount'],
-  ['document_info.po_number', 'PO number'],
+  ['document_info.execution_date', 'Execution Date'],
+  ['document_info.expiry_date', 'Expiry Date'],
+  ['document_info.validity_tenure', 'Validity Tenure'],
+  ['document_info.mrc_otc', 'MRC / OTC'],
+  ['document_info.termination_clause', 'Termination Clause'],
 ];
 
 // How often each field was found across processed documents.

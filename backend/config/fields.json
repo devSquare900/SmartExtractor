@@ -9,26 +9,11 @@
   ],
 
   "fields": [
-    {"section": "customer_info", "key": "name", "type": "text", "match": "contains",
-     "labels": ["nameofcustomer", "customername", "customer", "client", "clientname", "billedto", "soldto", "billto", "buyer", "buyername", "purchaser", "purchasername", "accountname", "attention", "attn", "recipient", "preparedfor", "issuedto", "to", "lessee", "tenant"]},
-    {"section": "customer_info", "key": "billing_address", "type": "text", "match": "contains",
-     "labels": ["billingaddress", "address", "shippingaddress", "shipto", "customeraddress", "location", "facility", "deliveryaddress", "siteaddress", "street", "streetaddress", "registeredaddress", "officeaddress", "mailaddress", "postaladdress", "ship-to", "bill-to", "destination"]},
-    {"section": "customer_info", "key": "poc_contact", "type": "text", "match": "contains",
-     "labels": ["pocname", "contactnumber", "contact", "phone", "phonenumber", "telephone", "mobile", "cell", "tel", "ph", "fax", "faxnumber", "cellphone", "mobilephone", "contactperson", "pointofcontact", "attentionto", "contactdetails", "representative", "rep", "direct", "office"]},
-    {"section": "customer_info", "key": "email", "type": "text", "match": "contains",
-     "labels": ["emailaddress", "email", "e-mail", "mail", "contactemail", "emailid", "electronicmail", "webmail", "supportemail", "salesemail", "billingemail"]},
-
-    {"section": "document_info", "key": "date", "type": "date", "match": "exact",
-     "labels": ["date", "dated", "invoicedate", "contractdate", "effectivedate", "issuedate", "billingdate", "orderdate", "creationdate", "documentdate", "dateofissue", "dateofinvoice", "submissiondate", "startdate", "enddate", "expirydate", "duedate", "paymentdate", "validuntil", "shipdate"]},
-    {"section": "document_info", "key": "doc_number", "type": "text", "match": "contains",
-     "labels": ["invoice#", "invoicenumber", "invoiceno", "contract#", "contractnumber", "contractno", "billnumber", "billno", "receiptno", "receiptnumber", "formno", "formnumber", "document#", "documentnumber", "documentno", "referencenumber", "referenceno", "ref#", "ref", "id", "tracking#", "trackingno", "ordernumber", "order#", "agreement#", "agreementno"]},
-    {"section": "document_info", "key": "amount", "type": "amount", "match": "exact",
-     "labels": ["grandtotal", "totalamount", "totalpayable", "amountdue", "totaldue", "netamount", "total", "amount", "balance", "balancedue", "subtotal", "paymentdue", "totalinvoice", "invoiceamount", "grossamount", "finalamount", "dueamount", "payableamount", "sum", "totalprice", "estimatedtotal", "cost", "totalcost"]},
-    {"section": "document_info", "key": "po_number", "type": "text", "match": "contains",
-     "labels": ["po#", "ponumber", "pono", "purchaseorder", "purchaseordernumber", "order#", "orderno", "ordernumber", "po", "purchaseorder#", "purchaseorderno", "customerpo", "clientpo", "buyerpo", "requisition#", "req#", "salesorder#", "so#"]},
-
-    {"section": null, "key": "service_provider", "type": "text", "match": "contains",
-     "labels": ["serviceprovider", "accountmanager", "vendor", "supplier", "merchant", "companyname", "from", "contractor", "subcontractor", "seller", "provider", "distributor", "biller", "payee", "remitto", "issuedby", "preparedby", "company", "organization", "agency", "lessor", "landlord"]}
+    {"section": "document_info", "key": "execution_date", "type": "date", "match": "contains", "labels": []},
+    {"section": "document_info", "key": "expiry_date", "type": "date", "match": "contains", "labels": []},
+    {"section": "document_info", "key": "validity_tenure", "type": "text", "match": "contains", "labels": []},
+    {"section": "document_info", "key": "mrc_otc", "type": "text", "match": "contains", "labels": []},
+    {"section": "document_info", "key": "termination_clause", "type": "text", "match": "contains", "labels": []}
   ],
 
   "line_items": {
