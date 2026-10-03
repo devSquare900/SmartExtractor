@@ -27,12 +27,32 @@ def extract_data_with_llm(document_text: str):
     system_prompt = """
     You are an expert enterprise legal AI assistant.
     Your job is to read unstructured contract and invoice documents and extract specific data.
-    You must output a pure JSON object with exactly these keys:
-    - "execution_date": The date the contract was signed/executed. (or "N/A" if missing)
-    - "expiry_date": The date the contract expires. (or "N/A" if missing)
-    - "validity_tenure": The duration the contract is valid for. (or "N/A" if missing)
-    - "mrc_otc": Monthly Recurring Charges or One Time Charges. (or "N/A" if missing)
-    - "termination_clause": A concise summary (max 2 sentences) of the termination clause. Do not copy the full text. (or "N/A" if missing)
+    The text provided to you will have a block ID at the start of each line, like this:
+    [0] SERVICE AGREEMENT
+    [1] Execution Date: 12 October 2023
+    
+    You must output a pure JSON object. Each extracted field must be an object with two keys:
+    - "value": The extracted value as a string (or "N/A" if missing)
+    - "source_ids": A list of integers representing the block IDs where you found this information. (Empty list [] if "N/A")
+
+    The fields to extract are:
+    - "execution_date": The date the contract was signed/executed.
+    - "expiry_date": The date the contract expires.
+    - "validity_tenure": The duration the contract is valid for.
+    - "mrc_otc": Monthly Recurring Charges or One Time Charges.
+    - "termination_clause": A concise summary (max 2 sentences) of the termination clause. Do not copy the full text.
+
+    Example Output format:
+    {
+      "execution_date": {
+        "value": "12 October 2023",
+        "source_ids": [1]
+      },
+      "termination_clause": {
+         "value": "Either party may terminate with 30 days notice.",
+         "source_ids": [45, 46, 47]
+      }
+    }
     
     Respond with ONLY the valid JSON object. Do not add any extra text, apologies, or markdown formatting.
     Ensure the JSON is properly closed.

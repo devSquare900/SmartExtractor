@@ -123,88 +123,87 @@ def get_doc_or_404(doc_id: str) -> dict:
 
 
 def extract_data(doc_id: str, pages: list) -> dict:
-    """Parses fields using Groq LLM instead of old manual parser."""
-    # 1. Combine text from OCR pages
-    full_text = ""
-    for page in pages:
+    """Parses fields using Groq LLM with exact block IDs for accurate bounding boxes."""
+    # 1. Flatten blocks and create ID mapping
+    block_map = {}
+    full_text_lines = []
+    
+    block_id = 0
+    for p_idx, page in enumerate(pages):
         for block in page.get("blocks", []):
-            full_text += block.get("text", "") + "\n"
+            text = block.get("text", "").strip()
+            if not text:
+                continue
+            
+            # Store block reference
+            block_map[block_id] = {
+                "box": block.get("box"),
+                "confidence": block.get("confidence", 0.5),
+                "page_num": p_idx + 1
+            }
+            
+            # Format for LLM
+            full_text_lines.append(f"[{block_id}] {text}")
+            block_id += 1
+
+    full_text = "\n".join(full_text_lines)
             
     # 2. Call the LLM (Llama-3)
     from services.llm_parser import extract_data_with_llm
     llm_result = extract_data_with_llm(full_text)
     if not llm_result:
         llm_result = {}
-
-    def get_val(key):
-        val = llm_result.get(key, "")
-        return "" if val == "N/A" else val
-
-    def get_confidence_and_box(val):
-        if not val:
-            return 1.0, None, None
         
-        val_lower = val.lower().strip()
-        if val_lower in ["n/a", "na", "not mentioned", "none", "not available", "missing"]:
-            return 1.0, None, None
-        
-        import re
-        words_val = [w for w in re.split(r'\W+', val_lower) if len(w) > 0]
-        if not words_val:
-            return 1.0, None, None
-
-        best_score = 0
-        best_conf = 0.5
-        best_box = None
-        best_page = None
-
-        for p_idx, page in enumerate(pages):
-            for block in page.get("blocks", []):
-                text = block.get("text", "").lower().strip()
-                words_text = [w for w in re.split(r'\W+', text) if len(w) > 0]
-                if not words_text:
-                    continue
-                
-                matched_words = 0
-                for w in words_val:
-                    if w in words_text:
-                        matched_words += 1
-                    else:
-                        # Partial match for longer words (e.g. October vs Oct)
-                        if len(w) >= 4 and any(w[:4] in wt for wt in words_text):
-                            matched_words += 0.5
-                
-                if matched_words == 0:
-                    continue
-                
-                match_ratio = matched_words / len(words_val)
-                score = match_ratio * 100
-                
-                # Penalty if block has way too many extra words
-                length_ratio = len(words_val) / max(1, len(words_text))
-                score += length_ratio * 20
-                
-                if text == val_lower:
-                    score += 50
-                elif val_lower in text:
-                    score += 30
-
-                # Must have a solid score (e.g. at least ~half the words matching)
-                if score > best_score and score >= 40:
-                    best_score = score
-                    best_conf = block.get("confidence", 0.5)
-                    best_box = block.get("box")
-                    best_page = p_idx + 1
-
-        return round(best_conf, 4), best_box, best_page
+    from services.parser import merge_boxes
 
     def make_field(key):
-        val = get_val(key)
-        conf, box, page_num = get_confidence_and_box(val) if val else (1.0, None, None)
-        field_dict = {"value": val, "confidence": conf}
-        if box:
-            field_dict["box"] = box
-            field_dict["page_num"] = page_num
+        # LLM now returns {"value": "...", "source_ids": [...]}
+        field_data = llm_result.get(key)
+        if isinstance(field_data, dict):
+            val = field_data.get("value", "")
+            source_ids = field_data.get("source_ids", [])
+        else:
+            # Fallback if LLM didn't follow format properly
+            val = str(field_data) if field_data else ""
+            source_ids = []
+
+        if val == "N/A" or not val:
+            val = ""
+
+        if not val:
+            return {"value": "", "confidence": 1.0}
+
+        # Find blocks for bounding box
+        matched_blocks = [block_map[sid] for sid in source_ids if sid in block_map]
+        
+        if not matched_blocks:
+            return {"value": val, "confidence": 1.0}
+            
+        # Group by page_num, take the page with most blocks
+        page_counts = {}
+        for b in matched_blocks:
+            page_counts[b["page_num"]] = page_counts.get(b["page_num"], 0) + 1
+            
+        best_page = max(page_counts.keys(), key=lambda p: page_counts[p])
+        
+        # Only merge boxes from the best page
+        page_blocks = [b for b in matched_blocks if b["page_num"] == best_page]
+        
+        conf = sum(b["confidence"] for b in page_blocks) / len(page_blocks)
+        boxes = [b["box"] for b in page_blocks if b["box"]]
+        
+        merged_box = None
+        if boxes:
+            merged_box = merge_boxes(boxes)
+
+        field_dict = {
+            "value": val,
+            "confidence": round(conf, 4)
+        }
+        if merged_box:
+            field_dict["box"] = merged_box
+            field_dict["page_num"] = best_page
+            
         return field_dict
 
     # 3. Format the result to match the expected legacy structure so the Frontend doesn't crash
