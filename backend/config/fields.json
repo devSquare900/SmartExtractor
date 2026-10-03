@@ -5,14 +5,19 @@
   "_labels_note": "Labels are compared lowercase without spaces, and are listed in priority order (first = preferred).",
 
   "contract_title_keywords": [
-    "AGREEMENT", "CONTRACT", "DEED", "MEMORANDUM", "PROPOSAL", "STATEMENT OF WORK", "ORDER FORM", "INVOICE", "RECEIPT", "QUOTATION", "QUOTE", "PURCHASE ORDER", "BILL OF LADING", "ESTIMATE", "WORK ORDER", "SERVICE AGREEMENT", "NON-DISCLOSURE", "NDA", "TERM SHEET", "LEASE"
+    "AGREEMENT", "CONTRACT", "DEED", "MEMORANDUM", "PROPOSAL", "STATEMENT OF WORK", "ORDER FORM", "INVOICE", 
+    "RECEIPT", "QUOTATION", "QUOTE", "PURCHASE ORDER", "BILL OF LADING", "ESTIMATE", "WORK ORDER", "SERVICE AGREEMENT", 
+    "NON-DISCLOSURE", "NDA", "TERM SHEET", "LEASE"
   ],
 
   "fields": [
     {"section": "document_info", "key": "execution_date", "type": "date", "match": "contains", "labels": []},
     {"section": "document_info", "key": "expiry_date", "type": "date", "match": "contains", "labels": []},
     {"section": "document_info", "key": "validity_tenure", "type": "text", "match": "contains", "labels": []},
-    {"section": "document_info", "key": "mrc_otc", "type": "text", "match": "contains", "labels": []},
+    {"section": "document_info", "key": "mrc", "type": "text", "match": "contains", "labels": []},
+    {"section": "document_info", "key": "mrc_discounted", "type": "text", "match": "contains", "labels": []},
+    {"section": "document_info", "key": "otc", "type": "text", "match": "contains", "labels": []},
+    {"section": "document_info", "key": "otc_discounted", "type": "text", "match": "contains", "labels": []},
     {"section": "document_info", "key": "termination_clause", "type": "text", "match": "contains", "labels": []}
   ],
 

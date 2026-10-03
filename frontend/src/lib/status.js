@@ -75,7 +75,10 @@ export const FIELD_LABELS = [
   ['document_info.execution_date', 'Execution Date'],
   ['document_info.expiry_date', 'Expiry Date'],
   ['document_info.validity_tenure', 'Validity Tenure'],
-  ['document_info.mrc_otc', 'MRC / OTC'],
+  ['document_info.mrc', 'MRC (Actual)'],
+  ['document_info.mrc_discounted', 'MRC (Discounted)'],
+  ['document_info.otc', 'OTC (Actual)'],
+  ['document_info.otc_discounted', 'OTC (Discounted)'],
   ['document_info.termination_clause', 'Termination Clause'],
 ];
 

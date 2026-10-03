@@ -16,7 +16,9 @@ from services import db
 from services.pdf_processor import convert_pdf_to_images
 from services.ocr_engine import recognize_region, run_ocr_on_images
 from services.cell_recovery import recover_empty_cells
-from services.parser import load_config, normalize_fields, parse_extracted_data
+from services.llm_parser import extract_fields
+from services.parser import (build_blocks, extract_contract_name, load_config, normalize_fields,
+                             parse_extracted_data)
 
 STORAGE_DIR = os.environ.get("SMARTEXTRACTOR_STORAGE", os.path.join(os.path.dirname(__file__), "storage"))
 UPLOAD_DIR = os.path.join(STORAGE_DIR, "uploads")
@@ -123,109 +125,25 @@ def get_doc_or_404(doc_id: str) -> dict:
 
 
 def extract_data(doc_id: str, pages: list) -> dict:
-    """Parses fields using Groq LLM with exact block IDs for accurate bounding boxes."""
-    # 1. Flatten blocks and create ID mapping
-    block_map = {}
-    full_text_lines = []
-    
-    block_id = 0
-    for p_idx, page in enumerate(pages):
-        for block in page.get("blocks", []):
-            text = block.get("text", "").strip()
-            if not text:
-                continue
-            
-            # Store block reference
-            block_map[block_id] = {
-                "box": block.get("box"),
-                "confidence": block.get("confidence", 0.5),
-                "page_num": p_idx + 1
-            }
-            
-            # Format for LLM
-            full_text_lines.append(f"[{block_id}] {text}")
-            block_id += 1
+    """Parses fields using the Groq LLM; the line IDs it cites give each field its highlight box."""
+    config = load_config()
+    fields = extract_fields(pages)
+    title = fields.pop("contract_name")
+    if not title["value"]:
+        # The LLM found no title: fall back to the keyword search on page 1
+        page1_blocks = [b for b in build_blocks(pages) if b["page_num"] == 1 and b["text"]]
+        title = extract_contract_name(page1_blocks, config) or title
 
-    full_text = "\n".join(full_text_lines)
-            
-    # 2. Call the LLM (Llama-3)
-    from services.llm_parser import extract_data_with_llm
-    llm_result = extract_data_with_llm(full_text)
-    if not llm_result:
-        llm_result = {}
-        
-    from services.parser import merge_boxes
-
-    def make_field(key):
-        # LLM now returns {"value": "...", "source_ids": [...]}
-        field_data = llm_result.get(key)
-        if isinstance(field_data, dict):
-            val = field_data.get("value", "")
-            source_ids = field_data.get("source_ids", [])
-        else:
-            # Fallback if LLM didn't follow format properly
-            val = str(field_data) if field_data else ""
-            source_ids = []
-
-        if val == "N/A" or not val:
-            val = ""
-
-        if not val:
-            return {"value": "", "confidence": 1.0}
-
-        # Find blocks for bounding box
-        matched_blocks = [block_map[sid] for sid in source_ids if sid in block_map]
-        
-        if not matched_blocks:
-            return {"value": val, "confidence": 1.0}
-            
-        # Group by page_num, take the page with most blocks
-        page_counts = {}
-        for b in matched_blocks:
-            page_counts[b["page_num"]] = page_counts.get(b["page_num"], 0) + 1
-            
-        best_page = max(page_counts.keys(), key=lambda p: page_counts[p])
-        
-        # Only merge boxes from the best page
-        page_blocks = [b for b in matched_blocks if b["page_num"] == best_page]
-        
-        conf = sum(b["confidence"] for b in page_blocks) / len(page_blocks)
-        boxes = [b["box"] for b in page_blocks if b["box"]]
-        
-        merged_box = None
-        if boxes:
-            merged_box = merge_boxes(boxes)
-
-        field_dict = {
-            "value": val,
-            "confidence": round(conf, 4)
-        }
-        if merged_box:
-            field_dict["box"] = merged_box
-            field_dict["page_num"] = best_page
-            
-        return field_dict
-
-    # 3. Format the result to match the expected legacy structure so the Frontend doesn't crash
+    # Shaped like the legacy parser output so the Frontend doesn't crash
     formatted_data = {
-        "contract_name": {"value": "LLM Extracted Document", "confidence": 1.0},
-        "document_info": {
-            "execution_date": make_field("execution_date"),
-            "expiry_date": make_field("expiry_date"),
-            "validity_tenure": make_field("validity_tenure"),
-            "mrc_otc": make_field("mrc_otc"),
-            "termination_clause": make_field("termination_clause")
-        },
+        "contract_name": title,
+        "document_info": fields,
         "customer_info": {},
         "line_items": {"columns": [], "rows": []}
     }
-    
-    # 4. Normalize fields before saving so that amounts and dates are correctly parsed
-    from services.parser import normalize_fields, load_config
-    config = load_config()
-    formatted_data = normalize_fields(formatted_data, config)
-    
-    return formatted_data
+
+    # Normalize fields before saving so that amounts and dates are correctly parsed
+    return normalize_fields(formatted_data, config)
 
 
 def process_document(doc_id: str, file_path: str):
