@@ -6,8 +6,37 @@ import cv2
 # so boxes line up with the rendered image.
 ZOOM = 2.0
 
-# A page needs at least this many characters in its text layer to skip OCR.
-MIN_TEXT_CHARS = 20
+# Minimum text requirements to skip OCR.
+# A page must have a genuine, dense text layer (not just DocuSign headers/stamps or watermarks)
+# to skip OCR. If a page has embedded images (typical of scanned contracts with digital stamp overlays)
+# it requires substantial text to be considered a digital document.
+MIN_DIGITAL_WORDS = 60
+MIN_DIGITAL_CHARS = 350
+MIN_TEXT_CHARS_NO_IMAGES = 80
+
+
+def is_digital_page(page, words) -> bool:
+    """
+    Determines if a page has a genuine digital text layer.
+    Returns False for scanned pages (even if they have DocuSign stamps, page numbers, or envelope IDs)
+    so that OCR runs and extracts the actual scanned contract body.
+    """
+    total_chars = sum(len(w[4]) for w in words)
+    total_words = len(words)
+    images = page.get_images()
+
+    if images:
+        # Page has embedded images. If text is sparse (e.g. DocuSign headers, envelope IDs, stamps),
+        # the actual document text is inside the scanned image!
+        if total_words < MIN_DIGITAL_WORDS or total_chars < MIN_DIGITAL_CHARS:
+            return False
+
+    # Page has no images: still require basic content (avoids skipping on blank or artifact pages)
+    if total_words < 15 or total_chars < MIN_TEXT_CHARS_NO_IMAGES:
+        return False
+
+    return True
+
 
 
 def _words_to_blocks(words, zoom):
@@ -79,7 +108,7 @@ def convert_pdf_to_images(file_path: str, images_dir: str, progress_callback=Non
 
                 text_blocks = None
                 words = page.get_text("words")
-                if sum(len(w[4]) for w in words) >= MIN_TEXT_CHARS:
+                if is_digital_page(page, words):
                     text_blocks = _words_to_blocks(words, ZOOM)
 
                 pages.append({"image_path": img_path, "text_blocks": text_blocks})

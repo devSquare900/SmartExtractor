@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, errorMessage } from './api';
 import { useHashRoute } from './lib/useHashRoute';
-import { computeStats } from './lib/status';
+import { computeStats, displayStatus } from './lib/status';
 import { useToast } from './components/toastContext';
 import NavRail from './components/NavRail';
 import UploadTray from './components/UploadTray';
@@ -10,6 +10,7 @@ import ConfirmDialog from './components/ConfirmDialog';
 import Overview from './pages/Overview';
 import Documents from './pages/Documents';
 import Review from './pages/Review';
+import PortfolioAssistant from './pages/PortfolioAssistant';
 import OfflineOverlay from './components/OfflineOverlay';
 import { ACCEPTED_TYPES } from './lib/uploads';
 
@@ -108,6 +109,39 @@ export default function App() {
     previousStatuses.current = Object.fromEntries(documents.map((d) => [d.doc_id, d.status]));
   }, [documents, notify]);
 
+  // Auto-navigate to newly uploaded documents when they finish processing
+  const previousUploadPhases = useRef({});
+  const hasAutoOpenedRef = useRef(false);
+
+  useEffect(() => {
+    uploads.forEach((u) => {
+      let phase = u.state;
+      if (u.state === 'uploaded') {
+        const doc = documents.find((d) => d.doc_id === u.docId);
+        const s = displayStatus(doc);
+        phase = s === 'processing' ? 'processing' : s === 'error' ? 'failed' : 'done';
+      }
+      
+      const prevPhase = previousUploadPhases.current[u.key];
+      if (prevPhase !== 'done' && phase === 'done') {
+        if (!hasAutoOpenedRef.current) {
+          hasAutoOpenedRef.current = true;
+          navigate(`/documents/${u.docId}`);
+        }
+      }
+    });
+    
+    previousUploadPhases.current = Object.fromEntries(uploads.map((u) => {
+      let phase = u.state;
+      if (u.state === 'uploaded') {
+        const doc = documents.find((d) => d.doc_id === u.docId);
+        const s = displayStatus(doc);
+        phase = s === 'processing' ? 'processing' : s === 'error' ? 'failed' : 'done';
+      }
+      return [u.key, phase];
+    }));
+  }, [uploads, documents, navigate]);
+
   // ----- Uploads -----
   const handleFiles = useCallback(async (fileList) => {
     const files = Array.from(fileList || []);
@@ -117,9 +151,13 @@ export default function App() {
       return;
     }
     uploadingRef.current = true;
+    hasAutoOpenedRef.current = false;
+
+    const isBulk = files.length > 1;
+    const batchId = isBulk ? `batch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` : null;
 
     const batch = files.map((file, i) => ({
-      key: `${Date.now()}-${i}-${file.name}`, name: file.name, progress: 0, state: 'queued',
+      key: `${Date.now()}-${i}-${file.name}`, name: file.name, progress: 0, state: 'queued', batchId,
     }));
     setUploads((current) => {
       // Keep existing items in the tray until the user explicitly clears them
@@ -127,21 +165,36 @@ export default function App() {
     });
     const patch = (key, changes) => setUploads((list) => list.map((u) => (u.key === key ? { ...u, ...changes } : u)));
 
-    for (const [i, file] of files.entries()) {
+    const uploadFile = async (i, file) => {
       const { key } = batch[i];
       patch(key, { state: 'uploading' });
       const form = new FormData();
       form.append('file', file);
+      if (batchId) {
+        form.append('batch_id', batchId);
+        form.append('batch_total', files.length);
+      }
       try {
         const response = await api.post('/upload', form, {
           onUploadProgress: (e) => e.total && patch(key, { progress: Math.round((e.loaded / e.total) * 100) }),
         });
-        patch(key, { state: 'uploaded', progress: 100, docId: response.data.doc_id });
+        patch(key, { state: 'uploaded', progress: 100, docId: response.data.doc_id, batchId: response.data.batch_id });
         fetchDocuments();
       } catch (error) {
         patch(key, { state: 'failed', error: errorMessage(error, 'Upload failed') });
       }
-    }
+    };
+
+    const CONCURRENCY = 3;
+    let index = 0;
+    const workerTasks = Array(CONCURRENCY).fill(0).map(async () => {
+      while (index < files.length) {
+        const currentIndex = index++;
+        await uploadFile(currentIndex, files[currentIndex]);
+      }
+    });
+    await Promise.all(workerTasks);
+    
     uploadingRef.current = false;
   }, [fetchDocuments, notify]);
 
@@ -181,7 +234,11 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
-  const shared = { documents, stats, loaded, online, navigate, onUpload: openFilePicker, onFiles: handleFiles, onDelete: setDeleteTarget };
+  const shared = { 
+    documents, stats, loaded, online, navigate, 
+    onUpload: openFilePicker, onFiles: handleFiles, onDelete: setDeleteTarget,
+    onRefresh: fetchDocuments
+  };
 
   let page;
   if (route.name === 'review') {
@@ -190,6 +247,8 @@ export default function App() {
         key={route.docId}
         docId={route.docId}
         doc={documents.find((d) => d.doc_id === route.docId)}
+        uploads={uploads}
+        documents={documents}
         {...shared}
         onDirtyChange={setDirty}
         onChanged={fetchDocuments}
@@ -197,6 +256,8 @@ export default function App() {
     );
   } else if (route.name === 'documents') {
     page = <Documents {...shared} query={route.query} />;
+  } else if (route.name === 'portfolio-ai') {
+    page = <PortfolioAssistant {...shared} />;
   } else {
     page = <Overview {...shared} />;
   }

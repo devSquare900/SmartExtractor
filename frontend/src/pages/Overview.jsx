@@ -203,13 +203,13 @@ export default function Overview({ documents, stats, loaded, navigate, onUpload,
               <span className="card-kicker">Extraction quality</span>
             </div>
             <div className="quality-row">
-              <div className="ring-wrap">
+              <div className="ring-wrap" title={`Field Confidence: ${percent(stats.avgConfidence)} | Completeness: ${percent(stats.coverage)}`}>
                 <Ring value={stats.avgConfidence} />
                 <span className="ring-label display">{percent(stats.avgConfidence)}</span>
               </div>
               <dl>
-                <div><dt>Avg. confidence</dt><dd className="mono">{percent(stats.avgConfidence)}</dd></div>
-                <div><dt>Fields found</dt><dd className="mono">{percent(stats.coverage)}</dd></div>
+                <div><dt title="Average confidence score on extracted values">Field Confidence</dt><dd className="mono">{percent(stats.avgConfidence)}</dd></div>
+                <div><dt title="Percentage of contract fields captured across documents">Completeness</dt><dd className="mono">{percent(stats.coverage)}</dd></div>
               </dl>
             </div>
           </section>
@@ -221,7 +221,10 @@ export default function Overview({ documents, stats, loaded, navigate, onUpload,
               <span className="muted small">Drag anywhere on the page</span>
             </div>
             <div className="card-pad">
-              <UploadDropzone onBrowse={onUpload} onFiles={onFiles} />
+              <UploadDropzone 
+                onBrowse={onUpload} 
+                onFiles={onFiles} 
+              />
             </div>
           </section>
 

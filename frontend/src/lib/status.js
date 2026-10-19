@@ -11,7 +11,14 @@ export function displayStatus(doc) {
   if (!doc) return 'processing';
   if (doc.status === 'processing') return 'processing';
   if (doc.status === 'error') return 'error';
-  if (!doc.edited && doc.summary?.low_confidence > 0) return 'review';
+  // Once the document is reviewed, verified, and saved by a user, it's Ready
+  if (doc.edited) return 'ready';
+
+  // If unedited, check both low-confidence detections AND missing fields
+  if (doc.summary) {
+    if (doc.summary.low_confidence > 0) return 'review';
+    if ((doc.summary.fields_found ?? 0) < (doc.summary.fields_total ?? 0)) return 'review';
+  }
   return 'ready';
 }
 
@@ -75,10 +82,8 @@ export const FIELD_LABELS = [
   ['document_info.execution_date', 'Execution Date'],
   ['document_info.expiry_date', 'Expiry Date'],
   ['document_info.validity_tenure', 'Validity Tenure'],
-  ['document_info.mrc', 'MRC (Actual)'],
-  ['document_info.mrc_discounted', 'MRC (Discounted)'],
-  ['document_info.otc', 'OTC (Actual)'],
-  ['document_info.otc_discounted', 'OTC (Discounted)'],
+  ['document_info.mrc', 'Monthly Recurring Charges (MRC)'],
+  ['document_info.otc', 'One Time Charges (OTC)'],
   ['document_info.termination_clause', 'Termination Clause'],
 ];
 
@@ -93,4 +98,56 @@ export function fieldCoverage(documents) {
   });
   const weakest = [...rows].sort((a, b) => a.found - b.found)[0];
   return { docs: done.length, rows, weakest: weakest && weakest.found < done.length ? weakest : null };
+}
+
+export function humanizeError(raw) {
+  if (!raw) {
+    return {
+      title: 'Processing Failed',
+      description: 'The file could not be processed due to an unexpected error. Try retrying.',
+      technical: ''
+    };
+  }
+  const s = String(raw).toLowerCase();
+
+  if (s.includes('password') || s.includes('encrypted')) {
+    return {
+      title: 'Password Protected',
+      description: 'This document is encrypted or password-protected and cannot be opened.',
+      technical: raw
+    };
+  }
+  if (s.includes('primitive') || s.includes('broken') || s.includes('corrupted') || s.includes('filedataerror') || s.includes('syntaxerror') || s.includes('not a valid pdf') || s.includes('empty')) {
+    return {
+      title: 'Corrupted or Unreadable PDF',
+      description: 'Could not render this PDF. The file may be damaged or formatted improperly.',
+      technical: raw
+    };
+  }
+  if (s.includes('ocr') || s.includes('paddle') || s.includes('tesseract') || s.includes('no text found') || s.includes('illegible')) {
+    return {
+      title: 'Scan Text Illegible',
+      description: 'Text could not be legibly recognized from the scanned pages.',
+      technical: raw
+    };
+  }
+  if (s.includes('rate_limit') || s.includes('rate limit') || s.includes('429') || s.includes('tpm') || s.includes('rpm') || s.includes('quota')) {
+    return {
+      title: 'AI Service Rate Limit',
+      description: 'AI model reached temporary rate limits. Retrying in a few moments will succeed.',
+      technical: raw
+    };
+  }
+  if (s.includes('timeout') || s.includes('timed out') || s.includes('connection') || s.includes('network') || s.includes('failed to fetch')) {
+    return {
+      title: 'Connection Timeout',
+      description: 'Network or AI response timed out while processing. Please retry.',
+      technical: raw
+    };
+  }
+  return {
+    title: 'Extraction Error',
+    description: raw.length > 80 ? raw.slice(0, 80) + '...' : raw,
+    technical: raw
+  };
 }

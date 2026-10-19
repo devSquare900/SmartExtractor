@@ -1,6 +1,9 @@
+import logging
 import threading
 
 import cv2
+
+logger = logging.getLogger("smartextractor.ocr")
 
 # PaddleOCR is loaded lazily and shared. It is not thread-safe, so every call
 # goes through _ocr_lock (background tasks run in a thread pool).
@@ -52,7 +55,7 @@ def run_ocr_on_images(pages: list[dict], progress_callback=None) -> list[dict]:
         blocks = page.get("text_blocks")
         source = "text_layer"
         if blocks is None:
-            print(f"Running OCR on page {page_idx + 1}: {img_path}")
+            logger.info(f"Running OCR on page {page_idx + 1}: {img_path}")
             blocks = ocr_image(img_path)
             source = "ocr"
 

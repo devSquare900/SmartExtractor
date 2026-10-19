@@ -11,3 +11,11 @@ export const serverUrl = (path) => `${SERVER_URL}${path}`;
 
 export const errorMessage = (error, fallback = 'Something went wrong') =>
   error?.response?.data?.detail || error?.message || fallback;
+
+export const getDepartments = () => api.get('/departments');
+export const createDepartment = (dept) => api.post('/departments', dept);
+export const updateDocumentDepartment = (docId, department) => api.patch(`/documents/${docId}/department`, { department });
+export const bulkUpdateDocumentDepartment = (docIds, department) => api.post('/documents/bulk-department', { doc_ids: docIds, department });
+export const classifyDocumentDepartment = (docId) => api.post(`/documents/${docId}/classify-department`);
+export const reprocessDocument = (docId) => api.post(`/documents/${docId}/reprocess`);
+export const bulkReprocessDocuments = (docIds) => api.post('/documents/bulk-reprocess', { doc_ids: docIds });

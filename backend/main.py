@@ -5,20 +5,32 @@ import re
 import shutil
 import traceback
 import uuid
+import hashlib
+import json
+import asyncio
+import time
+import dataclasses
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Body, FastAPI, File, BackgroundTasks, HTTPException, UploadFile
+logger = logging.getLogger("smartextractor.main")
+
+from fastapi import Body, FastAPI, File, BackgroundTasks, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from services import db
-from services.pdf_processor import convert_pdf_to_images
+from services.chat_service import stream_chat
+from services.portfolio_chat_service import stream_portfolio_chat
+from services.pdf_processor import convert_pdf_to_images, is_digital_page
 from services.ocr_engine import recognize_region, run_ocr_on_images
 from services.cell_recovery import recover_empty_cells
 from services.llm_parser import extract_fields
+from services.classifier import classify_contract_department
 from services.parser import (build_blocks, extract_contract_name, load_config, normalize_fields,
                              parse_extracted_data)
+from services.export_service import export_chat_response
 
 STORAGE_DIR = os.environ.get("SMARTEXTRACTOR_STORAGE", os.path.join(os.path.dirname(__file__), "storage"))
 UPLOAD_DIR = os.path.join(STORAGE_DIR, "uploads")
@@ -57,18 +69,22 @@ def compute_summary(data: dict, pages: list, config: dict = None) -> dict:
 
     fields = [get(f["section"], f["key"]) for f in config["fields"] if f["section"]]
     rows = (data.get("line_items") or {}).get("rows") or []
-    scored = [item["confidence"] for item in [*fields, *rows]
-              if item and not item.get("manual") and isinstance(item.get("confidence"), (int, float))]
+    scored = [
+        item["confidence"] for item in [*fields, *rows]
+        if item and not item.get("manual")
+        and str(item.get("value") or "").strip()
+        and isinstance(item.get("confidence"), (int, float))
+    ]
 
     field_status = {}
     for f, field in zip([f for f in config["fields"] if f["section"]], fields):
         value = (field or {}).get("value") or ""
         low = field and not field.get("manual") and isinstance(field.get("confidence"), (int, float)) \
-            and field["confidence"] < threshold
+            and field["confidence"] < threshold and bool(value.strip())
         field_status[f"{f['section']}.{f['key']}"] = "missing" if not value.strip() else "low" if low else "ok"
 
-    amount = get("document_info", "amount") or {}
-    date = get("document_info", "date") or {}
+    amount = get("document_info", "mrc") or get("document_info", "amount") or {}
+    date = get("document_info", "execution_date") or get("document_info", "date") or {}
     return {
         "title": (get(None, "contract_name") or {}).get("value"),
         "customer": (get("customer_info", "name") or {}).get("value"),
@@ -86,18 +102,111 @@ def compute_summary(data: dict, pages: list, config: dict = None) -> dict:
     }
 
 
+MAX_CONCURRENT_DOCS = 2
+
+@dataclasses.dataclass(order=True)
+class QueueItem:
+    priority: int
+    size: int
+    timestamp: float
+    doc_id: str = dataclasses.field(compare=False)
+    file_path: str = dataclasses.field(compare=False)
+
+document_queue = asyncio.PriorityQueue()
+workers = []
+
+async def queue_document(doc_id: str, file_path: str):
+    is_digital = False
+    if file_path.lower().endswith(".pdf"):
+        try:
+            import pymupdf as fitz
+            with fitz.open(file_path) as doc:
+                if len(doc) > 0:
+                    page = doc.load_page(0)
+                    words = page.get_text("words")
+                    is_digital = is_digital_page(page, words)
+        except Exception:
+            pass
+    try:
+        size = os.path.getsize(file_path)
+    except OSError:
+        size = 0
+    priority = 1 if is_digital else 2
+    await document_queue.put(QueueItem(priority, size, time.time(), doc_id, file_path))
+
+async def document_worker():
+    while True:
+        item = await document_queue.get()
+        doc_id, file_path = item.doc_id, item.file_path
+        try:
+            doc = db.get_document(doc_id)
+            if doc:
+                db.update_document(doc_id, status="processing", progress_pct=1, progress_msg="Starting...")
+                await asyncio.to_thread(process_document, doc_id, file_path)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            traceback.print_exc()
+        finally:
+            document_queue.task_done()
+
+async def async_backfill_departments():
+    """Background startup task: classifies any legacy completed documents without blocking server startup."""
+    try:
+        await asyncio.sleep(2)
+        all_docs = db.list_documents()
+        all_depts = db.list_departments(include_counts=False)
+        for d in all_docs:
+            if d.get("status") == "completed" and (not d.get("department") or d.get("department") == "General"):
+                full_doc = db.get_document(d["doc_id"])
+                if full_doc and full_doc.get("pages"):
+                    cls_res = await asyncio.to_thread(
+                        classify_contract_department,
+                        "",
+                        full_doc.get("pages") or [],
+                        full_doc.get("filename") or "",
+                        current_data(full_doc),
+                        all_depts
+                    )
+                    if cls_res.get("department") and cls_res["department"] != "General":
+                        db.update_document_department(d["doc_id"], cls_res["department"])
+                        logger.info(f"Auto-classified existing doc {d['filename']} -> {cls_res['department']}")
+                    await asyncio.sleep(0.5)
+    except Exception as e:
+        logger.warning(f"Startup classification backfill note: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
     db.mark_interrupted()
     imported = db.import_legacy_json(OCR_RESULTS_DIR, UPLOAD_DIR, parse_extracted_data)
     if imported:
-        print(f"Imported {imported} document(s) from legacy JSON storage")
+        logger.info(f"Imported {imported} document(s) from legacy JSON storage")
     config = load_config()
     for doc_id in db.ids_needing_summary():
         doc = db.get_document(doc_id)
         db.update_document(doc_id, summary=compute_summary(current_data(doc), doc["pages"], config))
+        
+    # Enterprise Queue: Start Workers
+    for _ in range(MAX_CONCURRENT_DOCS):
+        workers.append(asyncio.create_task(document_worker()))
+        
+    # Crash Recovery: Requeue pending documents
+    queued_docs = db.get_queued_documents()
+    for doc in queued_docs:
+        await queue_document(doc["doc_id"], doc["file_path"])
+
+    # Startup Auto-Classification: Classify existing completed documents in background (skip in pytest)
+    if not os.environ.get("PYTEST_CURRENT_TEST"):
+        asyncio.create_task(async_backfill_departments())
+        
     yield
+    
+    # Shutdown workers
+    for w in workers:
+        w.cancel()
+    await asyncio.gather(*workers, return_exceptions=True)
 
 
 app = FastAPI(title="SmartExtractor API", lifespan=lifespan)
@@ -147,38 +256,66 @@ def extract_data(doc_id: str, pages: list) -> dict:
 
 
 def process_document(doc_id: str, file_path: str):
-    """Background task: render pages, get text (PDF text layer or OCR), parse fields."""
+    """Background task: render pages, get text (PDF text layer or OCR), parse fields, and classify department."""
     def progress(pct: int, msg: str):
-        db.update_document(doc_id, progress_pct=pct, progress_msg=msg)
+        db.update_document(doc_id, status="processing", progress_pct=pct, progress_msg=msg)
 
     try:
-        progress(0, "Starting processing...")
+        progress(5, "Converting pages...")
         pages = convert_pdf_to_images(file_path, os.path.join(IMAGES_DIR, doc_id), progress_callback=progress)
         ocr_pages = run_ocr_on_images(pages, progress_callback=progress)
         
         progress(80, "Extracting fields and line items...")
         extracted = extract_data(doc_id, ocr_pages)
+
+        progress(90, "Classifying contract department...")
+        doc_obj = db.get_document(doc_id)
+        current_dept = doc_obj.get("department") if doc_obj else None
         
+        if not current_dept or current_dept == "General":
+            all_depts = db.list_departments(include_counts=False)
+            file_name = doc_obj.get("filename") if doc_obj else ""
+            classification = classify_contract_department(
+                text="",
+                ocr_pages=ocr_pages,
+                filename=file_name,
+                extracted=extracted,
+                departments=all_depts
+            )
+            assigned_dept = classification.get("department") or "General"
+        else:
+            assigned_dept = current_dept
+
         progress(95, "Saving document...")
         db.update_document(doc_id, status="completed", error=None, pages=ocr_pages, extracted=extracted,
+                           department=assigned_dept,
                            summary=compute_summary(extracted, ocr_pages), progress_pct=100, progress_msg="Done")
     except Exception as e:
-        print(f"Error processing {doc_id}: {traceback.format_exc()}")
+        logger.error(f"Error processing {doc_id}: {traceback.format_exc()}")
         db.update_document(doc_id, status="error", error=str(e) or e.__class__.__name__, progress_msg="Failed")
 
 
 @app.post("/api/upload")
-async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_document(
+    file: UploadFile = File(...),
+    batch_id: str = Form(None),
+    batch_total: int = Form(None),
+    department: str = Form(None),
+):
     original_name = os.path.basename(file.filename or "").strip()[:200] or "document"
     file_ext = os.path.splitext(original_name)[1].lower()
     if file_ext not in FILE_SIGNATURES:
         raise HTTPException(status_code=400, detail="Unsupported file format. Use PDF, PNG, JPG or TIFF.")
+
+    if batch_id:
+        db.create_batch(batch_id=batch_id, total_files=batch_total or 0)
 
     doc_id = str(uuid.uuid4())
     file_path = os.path.join(UPLOAD_DIR, f"{doc_id}{file_ext}")
 
     # Stream to disk in chunks so large files never sit fully in memory.
     size = 0
+    hasher = hashlib.sha256()
     try:
         with open(file_path, "wb") as f:
             first_chunk = True
@@ -193,6 +330,7 @@ async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = 
                     raise HTTPException(status_code=413,
                                         detail=f"File is larger than {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.")
                 f.write(chunk)
+                hasher.update(chunk) # Hash the PDF bytes
         if size == 0:
             raise HTTPException(status_code=400, detail="File is empty.")
     except HTTPException:
@@ -200,21 +338,125 @@ async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = 
             os.remove(file_path)
         raise
 
-    db.create_document(doc_id, original_name, file_path)
-    background_tasks.add_task(process_document, doc_id, file_path)
+    # --- Deduplication & Combined Hash ---
+    # We hash the config rules so if admin adds a new field, it automatically forces a rescan.
+    config = load_config()
+    rules_json = json.dumps(config, sort_keys=True)
+    hasher.update(rules_json.encode('utf-8'))
+    file_hash = hasher.hexdigest()
 
-    return {"doc_id": doc_id, "filename": original_name, "message": "Document uploaded and processing started"}
+    # Deduplication Logic
+    existing_doc_id = db.get_document_by_hash(file_hash)
+    
+    if existing_doc_id:
+        # We found a duplicate! No need to re-scan. (Time & Cost Saved)
+        # Clean up the physical file we just saved to save disk space
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        if batch_id:
+            db.update_document(existing_doc_id, batch_id=batch_id)
+        if department and department != "General":
+            db.update_document(existing_doc_id, department=department)
+
+        # Update progress so the frontend widget shows it's instantly completed
+        db.update_document(existing_doc_id, progress_pct=100, progress_msg="Smart match")
+        
+        return {
+            "doc_id": existing_doc_id, 
+            "batch_id": batch_id,
+            "filename": original_name, 
+            "message": "Recognized existing document. Smart match applied."
+        }
+
+    # Not a duplicate. Add to processing queue.
+    db.create_document(doc_id, original_name, file_path, file_hash, batch_id=batch_id, department=department or "General")
+    db.update_document(doc_id, status="queued", progress_pct=0, progress_msg="Waiting in queue...")
+    await queue_document(doc_id, file_path)
+
+    return {"doc_id": doc_id, "batch_id": batch_id, "filename": original_name, "message": "Document queued for processing"}
+
+
+@app.get("/api/departments")
+def get_departments():
+    return db.list_departments(include_counts=True)
+
+
+@app.post("/api/departments")
+def create_new_department(payload: dict = Body(...)):
+    name = (payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Department name is required.")
+    description = (payload.get("description") or "").strip()
+    color = (payload.get("color") or "#17332a").strip()
+    dept = db.create_department(name=name, description=description, color=color)
+    return dept
+
+
+@app.patch("/api/documents/{doc_id}/department")
+def update_doc_department(doc_id: str, payload: dict = Body(...)):
+    get_doc_or_404(doc_id)
+    dept = (payload.get("department") or "General").strip()
+    db.update_document_department(doc_id, dept)
+    return {"doc_id": doc_id, "department": dept}
+
+
+@app.post("/api/documents/bulk-department")
+def bulk_update_doc_department(payload: dict = Body(...)):
+    doc_ids = payload.get("doc_ids") or []
+    department = (payload.get("department") or "General").strip()
+    updated_count = db.bulk_update_document_department(doc_ids, department)
+    return {"updated_count": updated_count, "department": department}
+
+
+@app.post("/api/documents/{doc_id}/classify-department")
+def reclassify_doc_department(doc_id: str):
+    doc = get_doc_or_404(doc_id)
+    all_depts = db.list_departments(include_counts=False)
+    cls_res = classify_contract_department(
+        text="",
+        ocr_pages=doc.get("pages") or [],
+        filename=doc.get("filename") or "",
+        extracted=current_data(doc),
+        departments=all_depts
+    )
+    new_dept = cls_res.get("department") or "General"
+    db.update_document_department(doc_id, new_dept)
+    return {"doc_id": doc_id, "department": new_dept, "classification": cls_res}
 
 
 @app.get("/api/documents")
-def list_documents():
-    return db.list_documents()
+def list_documents(department: str = None):
+    return db.list_documents(department=department)
+
+
+@app.get("/api/batches")
+def list_batches():
+    return db.list_batches()
+
+
+@app.get("/api/batches/{batch_id}")
+def get_batch_info(batch_id: str):
+    batch = db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return batch
+
+
+@app.delete("/api/batches/{batch_id}")
+def delete_batch(batch_id: str):
+    doc_ids = db.delete_batch(batch_id)
+    for doc_id in doc_ids:
+        shutil.rmtree(os.path.join(IMAGES_DIR, doc_id), ignore_errors=True)
+    return {"deleted": batch_id, "count": len(doc_ids)}
 
 
 @app.get("/api/documents/{doc_id}")
 def get_document_info(doc_id: str):
     doc = get_doc_or_404(doc_id)
-    info = {k: doc[k] for k in ("doc_id", "filename", "status", "error", "created_at", "updated_at", "summary")}
+    info = {k: doc[k] for k in ("doc_id", "batch_id", "filename", "status", "error", "created_at", "updated_at", "summary", "department") if k in doc}
+    if "department" not in info or not info["department"]:
+        info["department"] = "General"
     return {**info, "edited": doc["edited"] is not None}
 
 
@@ -276,6 +518,33 @@ def reextract_document(doc_id: str):
         raise HTTPException(status_code=500, detail=str(e))
     db.update_document(doc_id, extracted=extracted, edited=None, summary=compute_summary(extracted, doc["pages"]))
     return {"edited": False, "data": extracted}
+
+
+@app.post("/api/documents/{doc_id}/reprocess")
+async def reprocess_document(doc_id: str):
+    """Re-runs the entire pipeline: rendering, AI OCR, and LLM extraction."""
+    doc = get_doc_or_404(doc_id)
+    if not doc.get("file_path") or not os.path.exists(doc["file_path"]):
+        raise HTTPException(status_code=404, detail="Original document file not found on server")
+    db.update_document(doc_id, status="queued", error=None, progress_pct=0, progress_msg="Queued for reprocessing...")
+    await queue_document(doc_id, doc["file_path"])
+    return {"message": "Document queued for complete reprocessing", "doc_id": doc_id}
+
+
+@app.post("/api/documents/bulk-reprocess")
+async def bulk_reprocess_documents(body: dict = Body(...)):
+    """Queues multiple documents for reprocessing."""
+    doc_ids = body.get("doc_ids", [])
+    if not doc_ids:
+        raise HTTPException(status_code=400, detail="doc_ids list required")
+    queued = []
+    for doc_id in doc_ids:
+        doc = db.get_document(doc_id)
+        if doc and doc.get("file_path") and os.path.exists(doc["file_path"]):
+            db.update_document(doc_id, status="queued", error=None, progress_pct=0, progress_msg="Queued for reprocessing...")
+            await queue_document(doc_id, doc["file_path"])
+            queued.append(doc_id)
+    return {"queued_count": len(queued), "doc_ids": queued}
 
 
 def field_rows(data: dict):
@@ -346,3 +615,124 @@ def get_document_images(doc_id: str):
     files = [f for f in os.listdir(doc_images_dir) if f.endswith((".jpg", ".png"))]
     files.sort(key=lambda x: int(''.join(filter(str.isdigit, x)) or 0))
     return [f"/api/images/{doc_id}/{filename}" for filename in files]
+
+
+@app.get("/api/documents/{doc_id}/chat")
+def get_chat(doc_id: str):
+    get_doc_or_404(doc_id)
+    return db.get_chat_history(doc_id)
+
+
+@app.post("/api/documents/{doc_id}/chat")
+async def chat_document(doc_id: str, payload: dict = Body(...)):
+    get_doc_or_404(doc_id)
+    message = (payload.get("message") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required.")
+
+    return StreamingResponse(
+        stream_chat(doc_id, message),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.delete("/api/documents/{doc_id}/chat")
+def clear_chat(doc_id: str):
+    get_doc_or_404(doc_id)
+    db.clear_chat_history(doc_id)
+    return {"message": "Chat history cleared"}
+
+
+@app.get("/api/chat/portfolio/sessions")
+def get_portfolio_sessions():
+    return db.list_chat_sessions()
+
+
+@app.post("/api/chat/portfolio/sessions")
+def create_portfolio_session(payload: dict = Body(default={})):
+    title = (payload.get("title") or "New Conversation").strip()
+    session_id = payload.get("session_id")
+    return db.get_or_create_chat_session(session_id=session_id, title=title)
+
+
+@app.patch("/api/chat/portfolio/sessions/{session_id}")
+def update_portfolio_session(session_id: str, payload: dict = Body(...)):
+    title = (payload.get("title") or "").strip()
+    if title:
+        db.update_chat_session_title(session_id, title)
+    return {"session_id": session_id, "title": title}
+
+
+@app.delete("/api/chat/portfolio/sessions/{session_id}")
+def delete_portfolio_session(session_id: str):
+    db.delete_chat_session(session_id)
+    return {"message": f"Session {session_id} deleted"}
+
+
+@app.get("/api/chat/portfolio")
+def get_portfolio_chat(session_id: str = None):
+    return db.get_portfolio_chat_history(session_id=session_id)
+
+
+@app.post("/api/chat/portfolio")
+async def chat_portfolio(payload: dict = Body(...)):
+    message = (payload.get("message") or "").strip()
+    session_id = payload.get("session_id")
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required.")
+
+    return StreamingResponse(
+        stream_portfolio_chat(message, session_id=session_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.delete("/api/chat/portfolio")
+def clear_portfolio_chat(session_id: str = None):
+    db.clear_portfolio_chat_history(session_id=session_id)
+    return {"message": "Portfolio chat history cleared"}
+
+
+@app.post("/api/chat/export")
+def export_chat_document(payload: dict = Body(...)):
+    content = (payload.get("content") or "").strip()
+    export_format = (payload.get("format") or "excel").strip()
+    query = (payload.get("query") or "").strip()
+    scope = (payload.get("scope") or "SmartExtractor Intelligence").strip()
+
+    if not content:
+        raise HTTPException(status_code=400, detail="Content cannot be empty.")
+
+    try:
+        file_bytes, media_type, filename = export_chat_response(
+            content=content,
+            export_format=export_format,
+            query=query,
+            scope=scope
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate export: {str(e)}")
+
+    return Response(
+        content=file_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )
+
+
+

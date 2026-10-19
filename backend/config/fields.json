@@ -15,9 +15,7 @@
     {"section": "document_info", "key": "expiry_date", "type": "date", "match": "contains", "labels": []},
     {"section": "document_info", "key": "validity_tenure", "type": "text", "match": "contains", "labels": []},
     {"section": "document_info", "key": "mrc", "type": "text", "match": "contains", "labels": []},
-    {"section": "document_info", "key": "mrc_discounted", "type": "text", "match": "contains", "labels": []},
     {"section": "document_info", "key": "otc", "type": "text", "match": "contains", "labels": []},
-    {"section": "document_info", "key": "otc_discounted", "type": "text", "match": "contains", "labels": []},
     {"section": "document_info", "key": "termination_clause", "type": "text", "match": "contains", "labels": []}
   ],
 

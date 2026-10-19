@@ -1,8 +1,11 @@
 import itertools
 import json
+import logging
 import os
 import re
 import threading
+
+logger = logging.getLogger("smartextractor.llm_parser")
 from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
@@ -20,7 +23,7 @@ MAX_OUTPUT_TOKENS = 4096
 
 # Groq caps the tokens of one request (8,000 per minute on the free tier), far below the
 # model's context window, so the document text gets a character budget. Raise it on a higher tier.
-MAX_INPUT_CHARS = int(os.environ.get("LLM_MAX_INPUT_CHARS", "16000"))
+MAX_INPUT_CHARS = int(os.environ.get("LLM_MAX_INPUT_CHARS", "11000"))
 
 # The model sometimes ends without writing any JSON; the same request usually works when repeated.
 # With several API keys there is at least one attempt per key.
@@ -38,7 +41,7 @@ DOT_LEADER = re.compile(r"\.{4,}|…{2,}")
 # Confidence given to a value the cited lines do not back up, so it is flagged for review.
 UNVERIFIED_CONFIDENCE = 0.5
 # Share of a value's words that must appear in the cited lines for it to count as backed up.
-MIN_OVERLAP = 0.75
+MIN_OVERLAP = 0.60
 
 # "summary" fields are reworded by the LLM, so their text cannot be checked against the source.
 # "keywords" (most specific first) decide which lines are kept when a document is over the budget.
@@ -49,9 +52,9 @@ FIELDS = {
         "keywords": [],
     },
     "execution_date": {
-        "description": "The date the contract was signed/executed.",
-        "keywords": ["execution date", "effective date", "dated", "signed", "executed", "commenc",
-                     "entered into", "date"],
+        "description": "The date the contract was signed, executed, or became effective (e.g. Effective Date, Commencement Date, Signed Date).",
+        "keywords": ["execution date", "effective date", "effective from", "commence", "commencement", "dated", "signed", "executed",
+                     "entered into", "agreement date", "contract date", "as of", "signing date", "date"],
     },
     "expiry_date": {
         "description": "The date the contract expires.",
@@ -64,29 +67,17 @@ FIELDS = {
     },
     "termination_clause": {
         "description": "A summary of the termination clause in at most 2 sentences. Do not copy the full text.",
-        "keywords": ["terminat", "notice period", "written notice", "days notice", "days' notice"],
+        "keywords": ["terminat", "notice period", "written notice", "days notice", "days' notice", "cancellation", "default"],
         "summary": True,
     },
     "mrc": {
-        "description": "The total Monthly Recurring Charges (MRC) at the full price, before any discount, "
-                       "with the currency. Use the total, not a single line item.",
+        "description": "The total Monthly Recurring Charges (MRC) with the currency. Use the total, not a single line item.",
         "keywords": ["mrc", "monthly recurring", "recurring", "per month", "/ month", "financials", "charges",
-                     "price", "monthly", "total"],
-    },
-    "mrc_discounted": {
-        "description": "The total Monthly Recurring Charges after discount, with the currency. "
-                       "null if the document shows no discounted price.",
-        "keywords": ["discount", "net total", "net amount", "net price"],
+                     "pricing", "commercial", "fee schedule", "fee", "price", "monthly", "annexure", "total"],
     },
     "otc": {
-        "description": "The total One Time Charges (OTC), e.g. installation or setup, at the full price, "
-                       "before any discount, with the currency. Use the total, not a single line item.",
-        "keywords": ["otc", "one time", "one-time", "non-recurring", "installation", "setup", "set-up"],
-    },
-    "otc_discounted": {
-        "description": "The total One Time Charges after discount, with the currency. "
-                       "null if the document shows no discounted price.",
-        "keywords": [],
+        "description": "The total One Time Charges (OTC), e.g. installation or setup, with the currency. Use the total, not a single line item.",
+        "keywords": ["otc", "one time", "one-time", "non-recurring", "installation", "setup", "set-up", "upfront", "initial fee"],
     },
 }
 
@@ -286,7 +277,7 @@ def extract_data_with_llm(document_text: str, keys: list = None) -> dict:
             )
             return json.loads(chat_completion.choices[0].message.content)
         except Exception as e:
-            print(f"Error during LLM extraction (attempt {attempt} of {attempts}): {e}")
+            logger.warning(f"Error during LLM extraction (attempt {attempt} of {attempts}): {e}")
             retryable = isinstance(e, RateLimitError) or (
                 isinstance(e, BadRequestError) and "json_validate_failed" in str(e))
             if not retryable or attempt == attempts:
@@ -294,7 +285,7 @@ def extract_data_with_llm(document_text: str, keys: list = None) -> dict:
 
 
 def _words(text: str) -> set:
-    return set(re.findall(r"\w+", text.lower()))
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
 
 
 def _to_ids(source_ids) -> list:
@@ -334,8 +325,12 @@ def build_field(raw, lines_by_id: dict, summary: bool = False) -> dict:
         nearby = {j for ln in cited for j in (ln["id"] - 1, ln["id"], ln["id"] + 1)}
         found = value_words & _words(" ".join(lines_by_id[j]["text"] for j in nearby if j in lines_by_id))
         verified = bool(value_words) and len(found) / len(value_words) >= MIN_OVERLAP
-        # Highlight only the cells holding the value, not the whole row.
-        blocks = [b for b in blocks if value_words & _words(b["text"])] or blocks
+        # Highlight only the cells holding the value. If cited row doesn't contain value words, check nearby rows.
+        matching = [b for b in blocks if value_words & _words(b["text"])]
+        if not matching:
+            nearby_blocks = [b for j in nearby if j in lines_by_id and lines_by_id[j]["page_num"] == page_num for b in lines_by_id[j]["blocks"]]
+            matching = [b for b in nearby_blocks if value_words & _words(b["text"])]
+        blocks = matching or blocks
 
     confidence = sum(b["confidence"] for b in blocks) / len(blocks)
     if not verified:

@@ -1,0 +1,987 @@
+/* ==========================================================================
+   SmartExtractor — Enterprise Smart Assistant
+   World-class conversational design harmonized with "Ink & Paper" system:
+   Claude / Perplexity open-canvas stream, floating capsule composer,
+   refined Harvey AI provenance citations, and silky smooth transitions.
+   ========================================================================== */
+
+.portfolio-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  position: relative;
+}
+
+/* ---------------------------------------------------------------- Top Header */
+.portfolio-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 32px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+/* Subtle top decorative brand line */
+.portfolio-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand) 0%, var(--lime) 50%, var(--brand) 100%);
+}
+
+.portfolio-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* SmartExtractor 3-Bar Brand Mark */
+.assistant-brand-mark {
+  flex: none;
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--hero);
+  display: grid;
+  align-content: center;
+  gap: 3.2px;
+  padding: 0 7.5px;
+  box-shadow: 0 4px 12px -3px rgba(23, 51, 42, 0.35);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.assistant-brand-mark:hover {
+  transform: rotate(-3deg) scale(1.05);
+}
+
+.assistant-brand-mark span {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(243, 240, 232, 0.9);
+}
+
+.assistant-brand-mark span:nth-child(2) {
+  width: 68%;
+}
+
+.assistant-brand-mark span.hl {
+  height: 4.5px;
+  background: var(--lime);
+  transform: rotate(-3deg);
+  box-shadow: 0 0 6px rgba(217, 242, 74, 0.6);
+}
+
+/* Large Mark for Empty State */
+.assistant-brand-mark.lg {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  gap: 4.5px;
+  padding: 0 12px;
+  margin: 0 auto 16px;
+  box-shadow: 0 8px 24px -6px rgba(23, 51, 42, 0.3);
+}
+
+.assistant-brand-mark.lg span {
+  height: 2.8px;
+}
+
+.assistant-brand-mark.lg span.hl {
+  height: 6.8px;
+}
+
+/* Micro Mark for Message Stream */
+.assistant-brand-mark.sm {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  gap: 2.2px;
+  padding: 0 5.5px;
+  box-shadow: 0 2px 6px rgba(23, 51, 42, 0.2);
+  margin-top: 3px;
+}
+
+.assistant-brand-mark.sm span {
+  height: 1.5px;
+}
+
+.assistant-brand-mark.sm span.hl {
+  height: 3.4px;
+}
+
+.assistant-brand-mark.pulse {
+  animation: badgePulse 1.6s infinite ease-in-out;
+}
+
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.portfolio-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.portfolio-header-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.portfolio-header-meta {
+  font-size: 0.8rem;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+
+/* Green Live Indicator Badge */
+.fresh-pulse-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--lime-ink);
+  background: var(--lime-wash);
+  padding: 2.5px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--lime-deep);
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 6px var(--ok);
+  animation: freshBlink 1.8s infinite ease-in-out;
+}
+
+@keyframes freshBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+.portfolio-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------------------------------------------------------------- Chat Body & Stream */
+.portfolio-body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg);
+}
+
+.portfolio-chat-pane {
+  position: relative;
+  flex: 1 1 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 360px;
+  transition: flex 0.25s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.portfolio-chat-pane.has-active-canvas {
+  flex: 1 1 54%;
+  max-width: 58%;
+}
+
+@media (max-width: 900px) {
+  .portfolio-chat-pane.has-active-canvas {
+    display: none;
+  }
+}
+
+.portfolio-messages-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 32px 140px;
+  display: flex;
+  flex-direction: column;
+  scroll-behavior: smooth;
+}
+
+.portfolio-messages-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+
+.portfolio-messages-scroll::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.portfolio-thread-wrapper {
+  max-width: 820px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  flex: 1;
+}
+
+/* ---------------------------------------------------------------- Empty Hero State */
+.portfolio-hero-empty {
+  max-width: 580px;
+  margin: auto;
+  padding: 40px 20px;
+  text-align: center;
+  animation: heroFadeIn 0.35s var(--ease);
+}
+
+@keyframes heroFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.portfolio-hero-title {
+  font-family: var(--font-display);
+  font-size: 2.1rem;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.025em;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.portfolio-hero-subtitle {
+  font-size: 0.95rem;
+  color: var(--ink-2);
+  margin: 10px auto 28px;
+  line-height: 1.55;
+  max-width: 480px;
+}
+
+.portfolio-hero-chips {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  text-align: left;
+  margin-top: 6px;
+}
+
+.portfolio-hero-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 13px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(27, 26, 23, 0.03);
+  transition: all 0.18s var(--ease);
+}
+
+.portfolio-hero-chip:hover {
+  background: var(--surface-2);
+  border-color: var(--brand);
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 14px -3px rgba(23, 51, 42, 0.12);
+}
+
+.portfolio-hero-chip .chip-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .portfolio-hero-chips {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------- Message Turns (Open Canvas) */
+.portfolio-turn {
+  display: flex;
+  flex-direction: column;
+  animation: turnFadeIn 0.25s var(--ease);
+}
+
+@keyframes turnFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* User Message: Sleek Minimalist Capsule (Claude/ChatGPT style) */
+.portfolio-turn.is-user {
+  align-items: flex-end;
+}
+
+.portfolio-user-turn {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 82%;
+}
+
+.portfolio-user-bubble {
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  padding: 10px 18px;
+  border-radius: 18px;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 1px 3px rgba(27, 26, 23, 0.04);
+}
+
+.portfolio-user-text {
+  font-size: 0.93rem;
+  line-height: 1.55;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+/* Assistant Message: Open Canvas, Typography-First Stream */
+.portfolio-turn.is-asst {
+  width: 100%;
+}
+
+.portfolio-asst-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+}
+
+.portfolio-asst-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Open, Clean Markdown Container (No Box Inside A Box!) */
+.portfolio-asst-body {
+  color: var(--ink);
+  font-size: 0.94rem;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.portfolio-asst-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.portfolio-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 4px 9px;
+  border-radius: var(--radius-xs);
+  font-size: 11.5px;
+  font-weight: 500;
+  transition: all 0.15s var(--ease);
+}
+
+.portfolio-action-btn:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+.portfolio-export-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 6px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+.portfolio-export-pill {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  color: var(--ink-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  transition: all 0.15s ease;
+}
+
+.portfolio-export-pill:hover:not(:disabled) {
+  color: var(--brand);
+  background: var(--surface);
+  border-color: var(--brand);
+  transform: translateY(-1px);
+}
+
+.portfolio-export-pill:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------- Typography & Markdown Styling */
+.portfolio-asst-body h1,
+.portfolio-asst-body h2,
+.portfolio-asst-body h3 {
+  font-family: var(--font-display);
+  color: var(--ink);
+  margin: 18px 0 8px 0;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+}
+
+.portfolio-asst-body h1:first-child,
+.portfolio-asst-body h2:first-child,
+.portfolio-asst-body h3:first-child {
+  margin-top: 0;
+}
+
+.portfolio-asst-body h1 { font-size: 1.25rem; }
+.portfolio-asst-body h2 { font-size: 1.1rem; color: var(--brand); }
+.portfolio-asst-body h3 { font-size: 1rem; }
+
+.portfolio-asst-body p {
+  margin: 0 0 12px 0;
+}
+
+.portfolio-asst-body p:last-child {
+  margin-bottom: 0;
+}
+
+.portfolio-asst-body ul,
+.portfolio-asst-body ol {
+  margin: 6px 0 14px 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.portfolio-asst-body li {
+  line-height: 1.6;
+}
+
+.portfolio-asst-body strong {
+  font-weight: 650;
+  color: var(--brand);
+}
+
+.portfolio-asst-body code {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  color: var(--ink);
+}
+
+.portfolio-link {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.portfolio-asst-body hr {
+  border: none;
+  border-top: 1px solid var(--line-strong);
+  margin: 18px 0 12px 0;
+  opacity: 0.85;
+}
+
+/* ---------------------------------------------------------------- Enterprise Provenance Citation Badges */
+.portfolio-doc-link-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  margin: 2px 4px 2px 0;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  vertical-align: baseline;
+  box-shadow: 0 1px 2px rgba(27, 26, 23, 0.04);
+  transition: all 0.2s var(--ease);
+}
+
+.portfolio-doc-link-pill:hover {
+  background: var(--surface);
+  border-color: var(--brand);
+  color: var(--brand);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgba(23, 51, 42, 0.15);
+}
+
+.doc-link-icon {
+  color: var(--brand);
+  opacity: 0.85;
+}
+
+.doc-link-arrow {
+  opacity: 0.55;
+  transition: transform 0.2s var(--ease);
+}
+
+.portfolio-doc-link-pill:hover .doc-link-arrow {
+  transform: translate(1px, -1px);
+  opacity: 1;
+}
+
+/* ---------------------------------------------------------------- Financial & Clause Tables */
+.fresh-table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  margin: 14px 0;
+  box-shadow: 0 1px 4px rgba(27, 26, 23, 0.03);
+  background: var(--surface);
+}
+
+.fresh-table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.fresh-table-wrapper th {
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-weight: 700;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+
+.fresh-table-wrapper td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--surface);
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.fresh-table-wrapper tr:last-child td {
+  border-bottom: none;
+}
+
+.fresh-table-wrapper tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--surface-2) 60%, var(--surface));
+}
+
+.fresh-table-wrapper tr:hover td {
+  background: color-mix(in srgb, var(--lime-wash) 24%, var(--surface));
+}
+
+/* ---------------------------------------------------------------- Streaming & Thinking State */
+.portfolio-thinking-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  box-shadow: 0 1px 4px rgba(27, 26, 23, 0.04);
+}
+
+.enterprise-streaming-cursor {
+  display: inline-block;
+  width: 2.5px;
+  height: 15px;
+  margin-left: 4px;
+  vertical-align: -2px;
+  border-radius: 2px;
+  background: var(--brand);
+  box-shadow: 0 0 6px rgba(23, 51, 42, 0.4);
+  animation: cursorBeam 0.8s infinite ease-in-out;
+}
+
+@keyframes cursorBeam {
+  0%, 100% { opacity: 1; transform: scaleY(1); }
+  50% { opacity: 0.2; transform: scaleY(0.7); }
+}
+
+/* ---------------------------------------------------------------- Floating Composer Capsule (Claude 4o Style) */
+.portfolio-composer-dock {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0 32px 24px;
+  background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--bg) 80%, transparent) 40%, var(--bg) 95%);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  z-index: 20;
+}
+
+.portfolio-composer-capsule {
+  pointer-events: auto;
+  max-width: 820px;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  padding: 10px 12px 10px 18px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  box-shadow: 
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 14px 40px -10px rgba(27, 26, 23, 0.16),
+    0 2px 8px rgba(27, 26, 23, 0.04);
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.portfolio-composer-capsule:focus-within {
+  border-color: var(--brand);
+  box-shadow: 
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 18px 48px -8px rgba(23, 51, 42, 0.24),
+    0 0 0 3.5px var(--lime-wash);
+}
+
+.portfolio-textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 14.5px;
+  line-height: 22px;
+  color: var(--ink);
+  resize: none;
+  max-height: 160px;
+  min-height: 24px;
+}
+
+.portfolio-textarea::placeholder {
+  color: var(--ink-3);
+}
+
+/* Send Button: Signature Lime Highlighter Button */
+.portfolio-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--lime);
+  color: var(--lime-ink);
+  border: 1px solid var(--lime-deep);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(29, 40, 6, 0.1);
+  transition: all 0.15s var(--ease);
+  flex-shrink: 0;
+}
+
+.portfolio-send-btn:hover:not(:disabled) {
+  background: #e4f762;
+  transform: scale(1.05);
+  box-shadow: 0 0 14px rgba(217, 242, 74, 0.6);
+}
+
+.portfolio-send-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.portfolio-composer-hint {
+  max-width: 820px;
+  width: 100%;
+  margin: 0 auto;
+  font-size: 11px;
+  color: var(--ink-3);
+  text-align: center;
+  pointer-events: auto;
+}
+
+/* ---------------------------------------------------------------- Sessions Drawer & Controls */
+.portfolio-header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+
+.portfolio-new-chat-btn {
+  background: var(--brand);
+  color: #fff;
+  border: 1px solid var(--brand);
+  box-shadow: 0 2px 6px rgba(23, 51, 42, 0.15);
+}
+
+.portfolio-new-chat-btn:hover {
+  background: #1e4538;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgba(23, 51, 42, 0.25);
+}
+
+.portfolio-history-toggle-btn {
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+.portfolio-history-toggle-btn:hover {
+  background: var(--surface);
+  border-color: var(--brand);
+}
+
+.portfolio-session-count-badge {
+  background: var(--lime);
+  color: var(--lime-ink);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-left: 2px;
+}
+
+/* Slide-Over Backdrop */
+.portfolio-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(27, 26, 23, 0.35);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  animation: drawerFadeIn 0.2s var(--ease);
+}
+
+@keyframes drawerFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* History Drawer Panel */
+.portfolio-history-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 90vw;
+  background: var(--surface);
+  border-left: 1px solid var(--line-strong);
+  box-shadow: -8px 0 32px rgba(27, 26, 23, 0.15);
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  animation: drawerSlideIn 0.25s var(--ease);
+}
+
+@keyframes drawerSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.portfolio-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.portfolio-drawer-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.portfolio-drawer-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s ease;
+}
+
+.portfolio-drawer-close-btn:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+.portfolio-drawer-actions {
+  padding: 14px 20px 8px;
+}
+
+.portfolio-drawer-new-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px dashed var(--line-strong);
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.18s var(--ease);
+}
+
+.portfolio-drawer-new-btn:hover {
+  background: var(--lime-wash);
+  border-color: var(--lime-deep);
+  color: var(--lime-ink);
+  transform: translateY(-1px);
+}
+
+.portfolio-sessions-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.portfolio-session-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s var(--ease);
+}
+
+.portfolio-session-item:hover {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+.portfolio-session-item.is-active {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+  box-shadow: 0 1px 3px rgba(27, 26, 23, 0.04);
+}
+
+.portfolio-session-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.portfolio-session-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+
+.portfolio-session-item.is-active .portfolio-session-title {
+  color: var(--brand);
+}
+
+.portfolio-session-meta {
+  font-size: 11px;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portfolio-session-del-btn {
+  background: transparent;
+  border: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.portfolio-session-item:hover .portfolio-session-del-btn {
+  opacity: 0.7;
+}
+
+.portfolio-session-del-btn:hover {
+  opacity: 1 !important;
+  color: var(--err);
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.portfolio-sessions-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+

@@ -218,9 +218,9 @@ def test_large_document_divides_the_fields_over_the_keys(monkeypatch):
     fields = extract_fields([make_page(blocks, height=2200)])
 
     groups = sorted(calls, key=lambda keys: "contract_name" not in keys)
-    assert groups[1] == ("mrc", "mrc_discounted", "otc", "otc_discounted")
+    assert groups[1] == ("termination_clause", "mrc", "otc")
     assert sorted(groups[0] + groups[1]) == sorted(llm_parser.FIELDS)
-    assert "19. Termination by the Customer" in calls[groups[0]]
+    assert "19. Termination by the Customer" in calls[groups[1]]
     assert list(fields) == list(llm_parser.FIELDS)
     assert fields["contract_name"]["value"] == "MASTER SERVICE AGREEMENT"
     assert fields["termination_clause"]["box"] == [[100, 1700], [900, 1700], [900, 1720], [100, 1720]]
@@ -228,5 +228,5 @@ def test_large_document_divides_the_fields_over_the_keys(monkeypatch):
 
 def test_field_groups():
     assert llm_parser.field_groups(1) == [list(llm_parser.FIELDS)]
-    assert [len(g) for g in llm_parser.field_groups(2)] == [5, 4]
+    assert [len(g) for g in llm_parser.field_groups(2)] == [4, 3]
     assert [len(g) for g in llm_parser.field_groups(99)] == [1] * len(llm_parser.FIELDS)

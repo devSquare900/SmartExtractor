@@ -8,6 +8,7 @@ function parse(hash) {
   const query = Object.fromEntries(new URLSearchParams(queryString));
   if (segments[0] === 'documents' && segments[1]) return { name: 'review', docId: segments[1], query };
   if (segments[0] === 'documents') return { name: 'documents', query };
+  if (segments[0] === 'portfolio-ai' || segments[0] === 'assistant' || segments[0] === 'smart-assistant') return { name: 'portfolio-ai', query };
   return { name: 'overview', query };
 }
 

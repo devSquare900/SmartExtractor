@@ -1,4 +1,4 @@
-import { LayoutDashboard, Files, Highlighter, AlertOctagon, Upload, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, Files, Highlighter, AlertOctagon, Sparkles, Upload, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export default function NavRail({ route, navigate, stats, online, theme, onToggleTheme, onUploadClick, collapsed, onToggleCollapse }) {
   const items = [
@@ -14,6 +14,10 @@ export default function NavRail({ route, navigate, stats, online, theme, onToggl
     {
       key: 'failed', label: 'Failed', icon: AlertOctagon, to: '/documents?status=error', count: stats.error,
       tone: 'bad', active: route.name === 'documents' && route.query.status === 'error', hideWhenZero: true,
+    },
+    {
+      key: 'portfolio-ai', label: 'Smart Assistant', icon: Sparkles, to: '/smart-assistant',
+      active: route.name === 'portfolio-ai',
     },
   ];
 

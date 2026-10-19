@@ -7,6 +7,9 @@ venv/
 
 # Backend data (uploads, page images, database)
 backend/storage/
+*.db
+*.sqlite
+*.sqlite3
 
 # Frontend
 node_modules/
@@ -18,3 +21,4 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+*.lnk

@@ -9,3 +9,4 @@ paddleocr==2.8.1
 setuptools  # paddle imports it at runtime
 groq>=0.9.0
 python-dotenv>=1.0.0
+psycopg2-binary>=2.9.9

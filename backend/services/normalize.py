@@ -26,6 +26,8 @@ def normalize_date(text: str, date_order: str = "DMY"):
     if not text:
         return None
     cleaned = re.sub(r"(\d)(st|nd|rd|th)\b", r"\1", text.strip(), flags=re.IGNORECASE)
+    cleaned = re.sub(r",(?=[^\s])", ", ", cleaned)
+    cleaned = re.sub(r"\b(?:day\s+of|of)\b", " ", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" .,:")
 
     ordered = DAY_FIRST_FORMATS if date_order.upper() == "DMY" else MONTH_FIRST_FORMATS
@@ -34,6 +36,17 @@ def normalize_date(text: str, date_order: str = "DMY"):
             return datetime.strptime(cleaned, fmt).strftime("%Y-%m-%d")
         except ValueError:
             continue
+
+    try:
+        from dateutil import parser
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            dt = parser.parse(cleaned, fuzzy=True, dayfirst=(date_order.upper() == "DMY"))
+            return dt.strftime("%Y-%m-%d")
+    except Exception:
+        pass
+
     return None
 
 
